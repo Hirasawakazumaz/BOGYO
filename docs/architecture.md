@@ -17,9 +17,12 @@
          +-------------+-----------+-----------+--------------+---------------+
          v             v           v           v              v               v
      intake/       scan/       sandbox/     block/         patch/          schedule/
-   logwatch,     scanner,    (replay —     nftables      (propose +       (systemd —
-   threatintel   cve         later)        drop rules    conflict eval    later)
-                                           no hack-back)  — later)
+   logwatch,     scanner,    replay        nftables      propose +        systemd timer
+   threatintel   cve         (Docker,      drop rules    conflict eval    + cron
+                             isolated)      no hack-back  (sandbox loop)
+
+                         graph/ SentinelPipeline ties the above together
+                         report/ tallies everything from the audit log
 ```
 
 ## Layers
@@ -31,10 +34,32 @@
 - **intake/** — pure, offline log analysis -> attacker IPs.
 - **block/** — defensive nftables blocking with TTL; dry-run builds the command only.
 - **scan/** — orchestration of nmap/nuclei (active) and OSV CVE lookup (passive).
+- **sandbox/** — `SandboxReplay`: ephemeral, network-isolated (`--internal`) Docker
+  Compose replica of an in-scope service. Attack-style validation routes through
+  `REDTEAM_ATTACK` + `environment="sandbox"` (hard-refused on production and when the
+  toggle is off); `--privileged` / host-namespace / `--cap-add` are refused; dry-run
+  returns commands; bring-up, each validation, and teardown are all audited and
+  teardown always runs.
+- **patch/** — `PatchProposer` generates config-hardening candidates
+  (`PATCH_PROPOSE`) via a clean `PatchBackend` interface: a deterministic offline
+  `RuleBackend` (default, keeps core testable) and a lazy `AnthropicBackend` that
+  falls back to rules. `ConflictEvaluator` + `PatchLoop` apply candidates in the
+  sandbox and iterate propose→evaluate→refine, checking startup/dependency/perf.
+  Candidates emit unified diffs. `apply_to_host` is the only host-mutating path —
+  `PATCH_APPLY` + `enable_patch_apply` + explicit `approved=True`, never in dry-run.
+- **graph/** — `SentinelPipeline` runs the guarded nodes intake→scan→sandbox→patch
+  propose→conflict eval→report in order (every node calls the guard first; a refused
+  capability is skipped, never forced). `build_langgraph` wires the same nodes into a
+  real `langgraph.StateGraph`; langgraph/anthropic are imported lazily so the core
+  works offline without the `agent` extra.
+- **schedule/** — emit a hardened systemd service+timer and a cron fallback for
+  periodic **defensive** runs; red-team/sandbox subcommands are refused (opt-in,
+  sandbox-only, never scheduled).
+- **report/** — Markdown+JSON run reports (breach tally, authorizations, applied
+  changes, analysis) built purely from the hash-chained audit log; a broken chain is
+  flagged.
 - **cli/** — operator commands (init, keygen, sign-scope, consent, status, verify,
-  block, scan, kill/resume).
-- **graph/ sandbox/ patch/ schedule/ report/** — approved later phases; each must
-  route active work through the guard.
+  block, scan, sandbox, patch, schedule, report, kill/resume).
 
 ## Execution modes
 - `dry_run: true` (default) — active operations return the exact command/plan and are

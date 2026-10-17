@@ -1,0 +1,30 @@
+# Example throwaway sandbox replica for `sentinel sandbox --compose`.
+#
+# This is a DISPOSABLE replica of an in-scope service, used to validate findings
+# and patch candidates OFF production. Safety properties enforced by the design:
+#   * the network is `internal: true` (no egress) — a replica under test cannot
+#     reach the real network;
+#   * NO `privileged: true`, NO `network_mode: host`, NO `pid: host`
+#     (SandboxReplay refuses a compose file that contains any of these);
+#   * everything is torn down with `docker compose down -v` after the run.
+#
+# Replace the image/config below with a faithful copy of the service you own and
+# are reproducing. Never point this at production data.
+
+name: sentinel_sbx
+
+services:
+  web:
+    image: nginx:stable
+    # read-only hardened copy of your real config goes here:
+    volumes:
+      - ./tools/nginx.sandbox.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - sandbox
+    # no published ports: reach it only from inside the isolated network
+    restart: "no"
+
+networks:
+  sandbox:
+    driver: bridge
+    internal: true   # no route to the outside world

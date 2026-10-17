@@ -62,12 +62,32 @@ sentinel scan 203.0.113.10 --tool nmap
 Enable real actions only after reviewing dry-run output: set `dry_run: false` and the
 relevant toggle in `config/settings.yaml`.
 
+```bash
+# reproduce a finding in an isolated Docker sandbox (needs enable_sandbox_redteam;
+# sandbox-only, hard-refused on production):
+sentinel sandbox --replica 10.0.0.5 --compose docker/sandbox.example.compose.yaml \
+  --validate "nuclei=docker run --rm --network sentinel_sbx_10_0_0_5 projectdiscovery/nuclei -u http://web"
+
+# propose config hardening as a unified diff (apply needs enable_patch_apply + --approve):
+sentinel patch --service sshd --config /etc/ssh/sshd_config
+
+# emit a systemd timer + cron fallback for a periodic defensive run (prints, never installs):
+sentinel schedule --command "block --from-logs /var/log/auth.log" --on-calendar daily
+
+# build a run report from the audit log:
+sentinel report --md run.md --json run.json
+```
+
 ## Status
 
 Implemented: safety core (scope/consent/audit/kill-switch/guard), defensive IP blocking,
-scan orchestration, passive CVE lookup, CLI, test suite.
-Planned (see the project plan): LangGraph orchestration, Docker sandbox replay,
-patch generation + conflict evaluation loop, systemd scheduling.
+scan orchestration, passive CVE lookup, **Docker sandbox replay**, **patch generation +
+sandbox conflict-evaluation loop**, **LangGraph orchestration** (lazy; offline-safe),
+**systemd/cron scheduling**, **audit-log run reports**, CLI, and test suite.
+
+The LangGraph brain and LLM patch generation need the optional extra
+(`pip install -e ".[agent]"`); everything else, including the full pipeline in dry-run,
+runs without it.
 
 ## Out of scope (by design)
 

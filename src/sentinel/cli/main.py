@@ -1,0 +1,267 @@
+"""`sentinel` CLI — operator interface with consent and safety gating.
+
+Subcommands:
+  init         create config/ + state/, generate the consent keypair
+  keygen       generate the scope signing keypair (scope.key / scope.pub)
+  sign-scope   sign config/scope.yaml -> config/scope.yaml.sig
+  consent      run the interactive consent flow -> config/consent.signed
+  status       show mode, toggles, scope hash, consent & audit integrity
+  verify       verify scope signature, consent, and audit-log chain
+  block        detect attacker IPs from a log file and block them (dry-run default)
+  scan         run an active scan against an in-scope host (dry-run default)
+  kill/resume  engage or release the kill-switch
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from .. import __version__
+from ..block import FirewallBlocker
+from ..core import killswitch
+from ..core.audit import AuditLog
+from ..core.config import Settings, load_verified_scope
+from ..core.consent import (
+    ACCEPT_PHRASE,
+    REQUIRED_CLAUSES,
+    ensure_consent_keypair,
+    verify_consent,
+    write_consent,
+)
+from ..core.errors import SentinelError
+from ..core.signing import generate_keypair, load_private_key, sign
+from ..guards import ScopeGuard
+from ..intake import detect_bruteforce_ips
+from ..scan import Scanner
+
+DEFAULT_SETTINGS = "config/settings.yaml"
+
+
+def _load_settings(path: str) -> Settings:
+    return Settings.load(path)
+
+
+def _print(msg: str) -> None:
+    print(msg, flush=True)
+
+
+# --------------------------------------------------------------------------- #
+# subcommands
+# --------------------------------------------------------------------------- #
+def cmd_init(args) -> int:
+    Path("config").mkdir(exist_ok=True)
+    Path("state").mkdir(exist_ok=True)
+    ensure_consent_keypair("config/consent.key", "config/consent.pub")
+    _print("created config/ and state/; generated consent keypair (config/consent.key).")
+    _print("next: edit config/scope.yaml and settings.yaml, then `sentinel keygen` + `sign-scope` + `consent`.")
+    return 0
+
+
+def cmd_keygen(args) -> int:
+    generate_keypair(Path("config/scope.key"), Path("config/scope.pub"))
+    _print("generated scope signing keypair: config/scope.key (keep secret), config/scope.pub")
+    return 0
+
+
+def cmd_sign_scope(args) -> int:
+    import yaml
+
+    from ..core.config import ScopeDoc
+
+    data = yaml.safe_load(Path(args.scope).read_text(encoding="utf-8")) or {}
+    scope = ScopeDoc.model_validate(data)
+    priv = load_private_key(Path(args.key))
+    sig = sign(priv, scope.canonical())
+    Path(args.scope + ".sig").write_bytes(sig)
+    _print(f"signed {args.scope} -> {args.scope}.sig  (scope_hash={scope.scope_hash()[:16]}…)")
+    return 0
+
+
+def cmd_consent(args) -> int:
+    settings = _load_settings(args.settings)
+    scope = load_verified_scope(
+        settings.paths.scope_file, settings.paths.scope_sig_file, settings.paths.scope_pubkey_file
+    )
+    ensure_consent_keypair(settings.paths.consent_file.replace(".signed", ".key"), settings.paths.consent_pubkey_file)
+    priv_key = settings.paths.consent_file.replace(".signed", ".key")
+
+    _print("=== Sentinel-Guard operator consent ===")
+    _print(f"scope owner: {scope.owner_name}  org: {scope.owner_org}")
+    _print(f"scope hash : {scope.scope_hash()}")
+    _print("You must accept ALL clauses:\n")
+    for cid, text in REQUIRED_CLAUSES.items():
+        _print(f"  [{cid}] {text}\n")
+
+    if args.yes:
+        name = args.operator_name or scope.owner_name
+        org = args.operator_org or scope.owner_org
+        accepted = list(REQUIRED_CLAUSES.keys())
+        phrase = ACCEPT_PHRASE
+    else:
+        name = input("operator name: ").strip()
+        org = input("operator org (optional): ").strip()
+        accepted = []
+        for cid in REQUIRED_CLAUSES:
+            ans = input(f"accept clause [{cid}]? type 'yes': ").strip().lower()
+            if ans == "yes":
+                accepted.append(cid)
+        _print(f'\nType exactly: {ACCEPT_PHRASE}')
+        phrase = input("> ").strip()
+
+    record = write_consent(
+        scope=scope,
+        operator_name=name,
+        operator_org=org,
+        accepted_clauses=accepted,
+        accept_phrase=phrase,
+        private_key_path=priv_key,
+        out_path=settings.paths.consent_file,
+    )
+    _print(f"\nconsent signed and saved to {settings.paths.consent_file}")
+    _print(f"bound to scope_hash={record.scope_hash[:16]}…")
+    return 0
+
+
+def cmd_status(args) -> int:
+    settings = _load_settings(args.settings)
+    _print(f"sentinel-guard {__version__}")
+    _print(f"dry_run: {settings.dry_run}")
+    _print(f"toggles: {settings.toggles.model_dump()}")
+    _print(f"limits : {settings.limits.model_dump()}")
+    try:
+        scope = load_verified_scope(
+            settings.paths.scope_file, settings.paths.scope_sig_file, settings.paths.scope_pubkey_file
+        )
+        _print(f"scope  : VERIFIED  hash={scope.scope_hash()[:16]}…  hosts={len(scope.allowed_hosts)} cidrs={len(scope.allowed_cidrs)}")
+        try:
+            verify_consent(settings.paths.consent_file, settings.paths.consent_pubkey_file, scope.scope_hash())
+            _print("consent: VERIFIED")
+        except SentinelError as exc:
+            _print(f"consent: NOT VALID — {exc}")
+    except SentinelError as exc:
+        _print(f"scope  : NOT VERIFIED — {exc}")
+    audit = AuditLog(settings.paths.audit_file)
+    _print(f"audit  : {'intact' if audit.verify_chain() else 'TAMPERED'}  ({settings.paths.audit_file})")
+    _print(f"kill   : {'ENGAGED' if Path(settings.paths.killswitch_file).exists() else 'clear'}")
+    return 0
+
+
+def cmd_verify(args) -> int:
+    settings = _load_settings(args.settings)
+    scope = load_verified_scope(
+        settings.paths.scope_file, settings.paths.scope_sig_file, settings.paths.scope_pubkey_file
+    )
+    verify_consent(settings.paths.consent_file, settings.paths.consent_pubkey_file, scope.scope_hash())
+    ok = AuditLog(settings.paths.audit_file).verify_chain()
+    if not ok:
+        _print("audit chain TAMPERED")
+        return 2
+    _print("OK: scope signature, consent, and audit chain all verify.")
+    return 0
+
+
+def cmd_block(args) -> int:
+    settings = _load_settings(args.settings)
+    guard = ScopeGuard.from_settings(settings)
+    blocker = FirewallBlocker(guard)
+    lines = Path(args.from_logs).read_text(encoding="utf-8", errors="replace").splitlines()
+    signals = detect_bruteforce_ips(lines, threshold=args.threshold)
+    if not signals:
+        _print("no offending IPs met the threshold.")
+        return 0
+    for sig in signals:
+        result = blocker.block_ip(sig.ip, ttl_seconds=args.ttl)
+        mode = "DRY-RUN" if result.dry_run else "APPLIED"
+        _print(f"[{mode}] {sig.ip} (x{sig.count}) -> {result.command}")
+    return 0
+
+
+def cmd_scan(args) -> int:
+    settings = _load_settings(args.settings)
+    guard = ScopeGuard.from_settings(settings)
+    plan = Scanner(guard).scan(args.target, tool=args.tool)
+    mode = "DRY-RUN" if plan.dry_run else f"rc={plan.returncode}"
+    _print(f"[{mode}] {plan.tool} {plan.target}: {' '.join(plan.command)}")
+    if plan.output:
+        _print(plan.output)
+    return 0
+
+
+def cmd_kill(args) -> int:
+    settings = _load_settings(args.settings)
+    killswitch.engage(settings.paths.killswitch_file, reason=args.reason or "manual")
+    _print(f"kill-switch ENGAGED: {settings.paths.killswitch_file}")
+    return 0
+
+
+def cmd_resume(args) -> int:
+    settings = _load_settings(args.settings)
+    killswitch.release(settings.paths.killswitch_file)
+    _print("kill-switch released.")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
+# parser
+# --------------------------------------------------------------------------- #
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="sentinel", description="Authorized proactive defense (own assets only).")
+    p.add_argument("--version", action="version", version=f"sentinel-guard {__version__}")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    def with_settings(sp):
+        sp.add_argument("--settings", default=DEFAULT_SETTINGS)
+        return sp
+
+    sub.add_parser("init").set_defaults(func=cmd_init)
+    sub.add_parser("keygen").set_defaults(func=cmd_keygen)
+
+    sp = sub.add_parser("sign-scope")
+    sp.add_argument("--scope", default="config/scope.yaml")
+    sp.add_argument("--key", default="config/scope.key")
+    sp.set_defaults(func=cmd_sign_scope)
+
+    sp = with_settings(sub.add_parser("consent"))
+    sp.add_argument("--yes", action="store_true", help="non-interactive accept-all (CI/testing)")
+    sp.add_argument("--operator-name", default="")
+    sp.add_argument("--operator-org", default="")
+    sp.set_defaults(func=cmd_consent)
+
+    with_settings(sub.add_parser("status")).set_defaults(func=cmd_status)
+    with_settings(sub.add_parser("verify")).set_defaults(func=cmd_verify)
+
+    sp = with_settings(sub.add_parser("block"))
+    sp.add_argument("--from-logs", required=True)
+    sp.add_argument("--threshold", type=int, default=5)
+    sp.add_argument("--ttl", type=int, default=3600)
+    sp.set_defaults(func=cmd_block)
+
+    sp = with_settings(sub.add_parser("scan"))
+    sp.add_argument("target")
+    sp.add_argument("--tool", default="nmap")
+    sp.set_defaults(func=cmd_scan)
+
+    sp = with_settings(sub.add_parser("kill"))
+    sp.add_argument("--reason", default="")
+    sp.set_defaults(func=cmd_kill)
+
+    with_settings(sub.add_parser("resume")).set_defaults(func=cmd_resume)
+    return p
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        return args.func(args)
+    except SentinelError as exc:
+        _print(f"REFUSED ({type(exc).__name__}): {exc}")
+        return 2
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        _print(f"ERROR: {exc}")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

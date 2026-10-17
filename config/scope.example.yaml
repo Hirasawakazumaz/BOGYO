@@ -1,0 +1,29 @@
+# Ownership scope — the assets YOU own or are explicitly authorized to test.
+# Copy to config/scope.yaml, edit, then sign it:
+#   sentinel keygen        # once: creates config/scope.key + config/scope.pub
+#   sentinel sign-scope    # signs config/scope.yaml -> config/scope.yaml.sig
+#
+# Editing this file by hand invalidates the signature until you re-sign, and any
+# change to its contents forces the operator to re-run `sentinel consent`.
+
+owner_name: "Your Name"
+owner_org: "Your Org"
+
+# Hosts (hostnames or literal IPs) you own and may act on.
+allowed_hosts:
+  - "web01.example.internal"
+  - "203.0.113.10"
+
+# Networks you own, in CIDR notation.
+allowed_cidrs:
+  - "203.0.113.0/24"
+  - "10.0.0.0/24"
+
+# Subset that is PRODUCTION. Red-team attack validation is HARD-REFUSED here;
+# only isolated sandbox replicas may be attacked.
+production_hosts:
+  - "web01.example.internal"
+  - "203.0.113.0/24"
+
+created_at: "2026-10-17"
+nonce: "change-me-to-a-random-string"

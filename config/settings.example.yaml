@@ -1,0 +1,36 @@
+# Sentinel-Guard operational settings.
+# Copy to config/settings.yaml and edit. Secrets are NEVER stored here — only the
+# NAMES of environment variables that hold API keys.
+
+# Master safety switch. Keep true until you have reviewed planned actions.
+dry_run: true
+
+# Every active capability is opt-in and defaults to false (default-deny).
+toggles:
+  enable_blocking: false        # install nftables drop rules for attacker IPs
+  enable_active_scan: false     # run nmap/nuclei against in-scope hosts
+  enable_sandbox_redteam: false # attack validation — ISOLATED SANDBOX ONLY
+  enable_patch_apply: false     # apply patches to real hosts (also needs approval)
+
+limits:
+  max_targets_per_run: 16
+  max_concurrency: 4
+  rate_per_minute: 60
+  scan_timeout_seconds: 900
+  time_window: ""               # e.g. "01:00-05:00" to restrict to a maintenance window
+
+intake:
+  log_paths:
+    - /var/log/auth.log
+  threatintel_api_env:          # provider -> env var holding the key
+    abuseipdb: ABUSEIPDB_API_KEY
+
+paths:
+  scope_file: config/scope.yaml
+  scope_sig_file: config/scope.yaml.sig
+  scope_pubkey_file: config/scope.pub
+  consent_file: config/consent.signed
+  consent_pubkey_file: config/consent.pub
+  audit_file: state/audit.jsonl
+  killswitch_file: state/KILL
+  state_dir: state

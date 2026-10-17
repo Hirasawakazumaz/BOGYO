@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel-guard"
+version = "0.1.0"
+description = "Authorized, consent-gated proactive defense & self-pentest orchestration for Linux servers (own assets only)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Sentinel-Guard contributors" }]
+keywords = ["security", "defense", "fail2ban", "nftables", "authorized-pentest", "langgraph"]
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+# Agent/orchestration stack — only needed to run the LangGraph brain & LLM patch generation.
+agent = [
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "anthropic>=0.40",
+    "requests>=2.31",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+sentinel = "sentinel.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,6 +1,10 @@
-"""sentinel.graph — placeholder package for an approved later phase.
+"""LangGraph-style orchestration of the guarded pipeline (langgraph imported lazily)."""
 
-Implemented in a subsequent milestone (see plan). Kept as a proper package so the
-repository layout is stable. All active operations here MUST route through
-sentinel.guards.ScopeGuard.authorize(...), like every other module.
-"""
+from .orchestrator import (
+    PipelineConfig,
+    PipelineState,
+    SentinelPipeline,
+    build_langgraph,
+)
+
+__all__ = ["SentinelPipeline", "PipelineConfig", "PipelineState", "build_langgraph"]

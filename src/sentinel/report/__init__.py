@@ -1,6 +1,5 @@
-"""sentinel.report — placeholder package for an approved later phase.
+"""Run reports (Markdown + JSON) built purely from the audit log."""
 
-Implemented in a subsequent milestone (see plan). Kept as a proper package so the
-repository layout is stable. All active operations here MUST route through
-sentinel.guards.ScopeGuard.authorize(...), like every other module.
-"""
+from .report import ReportBuilder, RunReport
+
+__all__ = ["ReportBuilder", "RunReport"]

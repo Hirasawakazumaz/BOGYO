@@ -1,6 +1,5 @@
-"""sentinel.schedule — placeholder package for an approved later phase.
+"""Scheduling: emit systemd service+timer and a cron fallback for defensive runs."""
 
-Implemented in a subsequent milestone (see plan). Kept as a proper package so the
-repository layout is stable. All active operations here MUST route through
-sentinel.guards.ScopeGuard.authorize(...), like every other module.
-"""
+from .units import ScheduleUnit, generate
+
+__all__ = ["ScheduleUnit", "generate"]

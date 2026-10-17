@@ -72,7 +72,6 @@ class SentinelPipeline:
 
     def node_scan(self, state: PipelineState) -> PipelineState:
         if not state.config.target:
-            state.skipped.append("scan:no-target")
             return self._skip(state, "scan", "no target configured")
         try:
             plan = Scanner(self.guard).scan(state.config.target, tool=state.config.tool)

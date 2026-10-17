@@ -1,6 +1,5 @@
-"""sentinel.sandbox — placeholder package for an approved later phase.
+"""Ephemeral, network-isolated Docker sandbox replay for off-production validation."""
 
-Implemented in a subsequent milestone (see plan). Kept as a proper package so the
-repository layout is stable. All active operations here MUST route through
-sentinel.guards.ScopeGuard.authorize(...), like every other module.
-"""
+from .replay import SandboxPlan, SandboxReplay, ValidationResult
+
+__all__ = ["SandboxReplay", "SandboxPlan", "ValidationResult"]

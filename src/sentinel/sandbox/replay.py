@@ -11,10 +11,16 @@ Design rules baked in here:
 
 * The dedicated network is created ``--internal`` (no egress) so a replica can
   never reach the real network while being probed.
-* ``--privileged`` is refused everywhere (compose file contents and any
-  validation command), so a sandbox can never gain host capabilities.
+* A compose file is **parsed as YAML** (not string-matched) and refused unless
+  every service attaches only to networks declared ``internal: true`` and no
+  service opens an escape hatch (``privileged``, host namespaces, ``cap_add``,
+  ``devices``, unconfined ``security_opt``, a docker-socket / host-path bind,
+  or published ``ports``).
+* ``--privileged`` and host-namespace/socket escalations are refused in every
+  validation command too, and a validation command must be bound to the sandbox
+  network/project so it cannot target an arbitrary host.
 * ``dry_run`` (the default) returns the exact docker/compose commands and runs
-  nothing.
+  nothing — but all of the above checks still run so a plan can be refused.
 * Bring-up and teardown are always recorded to the hash-chained audit log, and
   teardown runs even if a validation raises (context-manager / ``replay``).
 
@@ -27,21 +33,96 @@ from __future__ import annotations
 import shutil
 import subprocess
 from dataclasses import dataclass, field
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional
+
+import yaml
 
 from ..core.actions import ActionClass
 from ..core.errors import ModeViolation
 from ..guards import ScopeGuard
 
-#: Substrings that must never appear in a sandbox command (capability escalation).
-_FORBIDDEN_TOKENS = ("--privileged", "--cap-add", "--pid=host", "--network=host")
+#: Host paths a sandbox must never bind-mount (docker-socket escape, host FS).
+_SENSITIVE_HOST_PATHS = (
+    "/var/run/docker.sock",
+    "/run/docker.sock",
+    "/",
+    "/etc",
+    "/root",
+    "/home",
+    "/var/run",
+    "/run",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/boot",
+    "/var/lib/docker",
+)
+
+#: CLI flags that share a host namespace when their value is ``host``.
+_HOST_NS_FLAGS = {"--network", "--net", "--pid", "--ipc", "--uts", "--userns", "--cgroupns"}
+
+
+def _is_sensitive_source(source: str) -> bool:
+    """True if a bind-mount *host* source is the docker socket or a sensitive path."""
+    s = (source or "").strip()
+    if "docker.sock" in s:
+        return True
+    if not s.startswith("/"):
+        return False  # named volume or project-relative path (./…) is fine
+    s = s.rstrip("/") or "/"
+    for p in _SENSITIVE_HOST_PATHS:
+        pp = p.rstrip("/") or "/"
+        if s == pp or s.startswith(pp + "/"):
+            return True
+    return False
+
+
+def _is_sensitive_bind(spec: str) -> bool:
+    """Short-form ``source:target[:mode]`` bind check."""
+    return _is_sensitive_source(spec.split(":", 1)[0]) or "docker.sock" in spec
 
 
 def _assert_no_escalation(tokens: list[str], where: str) -> None:
-    joined = " ".join(tokens)
-    for bad in _FORBIDDEN_TOKENS:
-        if bad in tokens or bad in joined:
-            raise ModeViolation(f"refused {bad!r} in sandbox {where}: capability escalation is not allowed")
+    """Refuse privilege/namespace/socket escalation in a raw command (fail closed).
+
+    The *primary* defense for compose replicas is structural YAML analysis; this
+    guards free-form validation/bring-up commands and catches ``--net=host`` and
+    space-separated ``--network host`` variants.
+    """
+    def refuse(what: str) -> None:
+        raise ModeViolation(f"refused {what} in sandbox {where}: capability escalation is not allowed")
+
+    n = len(tokens)
+    for i, tok in enumerate(tokens):
+        nxt = tokens[i + 1] if i + 1 < n else ""
+        if tok == "--privileged":
+            refuse("--privileged")
+        if tok == "--cap-add" or tok.startswith("--cap-add="):
+            refuse("--cap-add")
+        if tok == "--device" or tok.startswith("--device="):
+            refuse("--device")
+        if tok == "--security-opt" and "unconfined" in nxt:
+            refuse(f"--security-opt {nxt}")
+        if tok.startswith("--security-opt=") and "unconfined" in tok:
+            refuse(tok)
+        # host namespaces: --net=host / --network=host / --pid=host / ... (= form)
+        if "=" in tok:
+            flag, _, val = tok.partition("=")
+            if flag in _HOST_NS_FLAGS and val == "host":
+                refuse(tok)
+        # space-separated form: --network host / --net host / --pid host / ...
+        elif tok in _HOST_NS_FLAGS and nxt == "host":
+            refuse(f"{tok} host")
+        # docker-socket / sensitive bind mounts
+        if tok in ("-v", "--volume", "--mount") and _is_sensitive_bind(nxt):
+            refuse(f"bind mount {nxt!r}")
+        if (tok.startswith("--volume=") or tok.startswith("-v=") or tok.startswith("--mount=")) and _is_sensitive_bind(
+            tok.split("=", 1)[1]
+        ):
+            refuse(tok)
+        if "docker.sock" in tok:
+            refuse(tok)
 
 
 @dataclass(frozen=True)
@@ -128,7 +209,7 @@ class SandboxReplay:
         for c in cmds:
             _assert_no_escalation(c, "bring-up")
         if self.compose_file is not None:
-            self._guard_compose_file(self.compose_file)
+            self._validate_compose_file(self.compose_file)
 
         dry = self.guard.settings.dry_run
         if dry:
@@ -159,6 +240,7 @@ class SandboxReplay:
         refuses this on production targets and when the toggle is off.
         """
         _assert_no_escalation(command, "validation command")
+        self._assert_bound_to_sandbox(command)
         # THE gate: attack-style validation is sandbox-only, non-production, opt-in.
         decision = self.guard.authorize(
             ActionClass.REDTEAM_ATTACK, target=self.replica, environment="sandbox"
@@ -230,17 +312,132 @@ class SandboxReplay:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.down()
 
-    # -- safety helper ------------------------------------------------------- #
-    @staticmethod
-    def _guard_compose_file(path: str) -> None:
-        from pathlib import Path
+    # -- F3: validations must be bound to this sandbox, not arbitrary hosts -- #
+    def _assert_bound_to_sandbox(self, command: list[str]) -> None:
+        joined = " ".join(command)
+        refs_sandbox = (
+            self.network in command
+            or self.project in command
+            or self.network in joined
+            or self.project in joined
+        )
+        if not refs_sandbox:
+            raise ModeViolation(
+                f"refused validation command: it references neither the sandbox network "
+                f"{self.network!r} nor the compose project {self.project!r}; validations must run "
+                "inside the isolated sandbox, never against an arbitrary host"
+            )
+        # A `docker run`/`docker create` must explicitly attach to the internal net.
+        if "docker" in command and ("run" in command or "create" in command):
+            bound = False
+            for i, tok in enumerate(command):
+                nxt = command[i + 1] if i + 1 < len(command) else ""
+                if tok in ("--network", "--net") and nxt == self.network:
+                    bound = True
+                if tok in (f"--network={self.network}", f"--net={self.network}"):
+                    bound = True
+            if not bound:
+                raise ModeViolation(
+                    f"refused docker run/create validation: must use --network {self.network} so it "
+                    "runs inside the isolated, no-egress sandbox network"
+                )
 
+    # -- F1/F2: structural (YAML) analysis of the compose replica ------------ #
+    def _validate_compose_file(self, path: str) -> None:
+        """Parse the compose file and refuse any isolation hole (fail closed).
+
+        Runs in dry-run too, so an unsafe plan is refused before anything starts.
+        A missing file is skipped (dry-run may reference a not-yet-written file);
+        a file that cannot be parsed is refused.
+        """
         p = Path(path)
         if not p.exists():
-            return  # dry-run may reference a not-yet-written file; command is still safe
-        text = p.read_text(encoding="utf-8", errors="replace")
-        for bad in ("privileged: true", "network_mode: host", "network_mode: \"host\"", "pid: host"):
-            if bad in text:
-                raise ModeViolation(
-                    f"refused compose file {path!r}: contains {bad!r} (capability escalation)"
-                )
+            return
+        try:
+            doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            raise ModeViolation(f"refused compose file {path!r}: cannot parse YAML ({exc})") from exc
+        if not isinstance(doc, dict):
+            raise ModeViolation(f"refused compose file {path!r}: top level is not a mapping")
+
+        networks = doc.get("networks") or {}
+        internal_nets: set[str] = set()
+        if isinstance(networks, dict):
+            for name, spec in networks.items():
+                spec = spec or {}
+                if isinstance(spec, dict) and spec.get("internal") is True and not spec.get("external"):
+                    internal_nets.add(name)
+
+        services = doc.get("services") or {}
+        if not isinstance(services, dict) or not services:
+            raise ModeViolation(f"refused compose file {path!r}: no services defined")
+        for sname, svc in services.items():
+            svc = svc or {}
+            if not isinstance(svc, dict):
+                raise ModeViolation(f"refused compose file {path!r}: service {sname!r} is not a mapping")
+            self._check_service_escalation(path, sname, svc)
+            self._check_service_isolation(path, sname, svc, internal_nets)
+
+    @staticmethod
+    def _check_service_escalation(path: str, sname: str, svc: dict[str, Any]) -> None:
+        def refuse(what: str) -> None:
+            raise ModeViolation(f"refused compose file {path!r}: service {sname!r} {what}")
+
+        if svc.get("privileged") is True:
+            refuse("sets privileged: true")
+        nm = svc.get("network_mode")
+        if nm is not None and nm != "none":
+            refuse(f"sets network_mode: {nm!r} (only 'none' is allowed; use an internal network)")
+        for key in ("pid", "ipc", "uts"):
+            if svc.get(key) == "host":
+                refuse(f"shares the host {key} namespace ({key}: host)")
+        if svc.get("userns_mode") == "host":
+            refuse("sets userns_mode: host")
+        if svc.get("cgroup") == "host":
+            refuse("sets cgroup: host")
+        if svc.get("cap_add"):
+            refuse(f"adds Linux capabilities (cap_add: {svc.get('cap_add')!r})")
+        if svc.get("devices"):
+            refuse("passes through host devices (devices:)")
+        secopt = svc.get("security_opt") or []
+        if isinstance(secopt, list):
+            for s in secopt:
+                if "unconfined" in str(s):
+                    refuse(f"disables sandboxing confinement (security_opt: {s!r})")
+        for vol in svc.get("volumes") or []:
+            if isinstance(vol, str):
+                if _is_sensitive_bind(vol):
+                    refuse(f"bind-mounts a sensitive host path (volumes: {vol!r})")
+            elif isinstance(vol, dict) and vol.get("type") == "bind":
+                src = str(vol.get("source", ""))
+                if _is_sensitive_source(src):
+                    refuse(f"bind-mounts a sensitive host path (source: {src!r})")
+        if svc.get("ports"):
+            refuse("publishes ports to the host (ports:); the sandbox must stay internal")
+
+    @staticmethod
+    def _check_service_isolation(
+        path: str, sname: str, svc: dict[str, Any], internal_nets: set[str]
+    ) -> None:
+        def refuse(what: str) -> None:
+            raise ModeViolation(f"refused compose file {path!r}: service {sname!r} {what}")
+
+        if svc.get("network_mode") == "none":
+            return  # fully network-less: isolated
+        nets = svc.get("networks")
+        if nets is None:
+            refuse(
+                "declares no networks and would join the default bridge (egress); attach it only "
+                "to a network declared internal: true"
+            )
+        if isinstance(nets, dict):
+            names = list(nets.keys())
+        elif isinstance(nets, list):
+            names = list(nets)
+        else:
+            refuse(f"has an unrecognized networks: declaration ({nets!r})")
+        if not names:
+            refuse("declares an empty networks: list")
+        for n in names:
+            if n not in internal_nets:
+                refuse(f"attaches to network {n!r}, which is not declared internal: true")

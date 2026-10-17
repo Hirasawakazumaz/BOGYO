@@ -15,7 +15,7 @@ def test_report_tallies_allow_deny_and_breaches(make_env, tmp_path):
 
     # one confirmed breach in the sandbox
     sb = SandboxReplay(guard, replica="10.0.0.5", runner=lambda a: (0, "hit"))
-    sb.validate("nuclei", ["docker", "run", "--rm", "nuclei"])
+    sb.validate("nuclei", ["docker", "run", "--rm", "--network", sb.network, "nuclei"])
 
     # one denied action (out of scope)
     try:

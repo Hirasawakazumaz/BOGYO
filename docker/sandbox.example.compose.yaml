@@ -1,12 +1,18 @@
 # Example throwaway sandbox replica for `sentinel sandbox --compose`.
 #
 # This is a DISPOSABLE replica of an in-scope service, used to validate findings
-# and patch candidates OFF production. Safety properties enforced by the design:
-#   * the network is `internal: true` (no egress) — a replica under test cannot
-#     reach the real network;
-#   * NO `privileged: true`, NO `network_mode: host`, NO `pid: host`
-#     (SandboxReplay refuses a compose file that contains any of these);
-#   * everything is torn down with `docker compose down -v` after the run.
+# and patch candidates OFF production. SandboxReplay parses this file as YAML
+# (not string matching) and REFUSES it (ModeViolation, fail-closed, even in
+# dry-run) unless, for every service:
+#   * it attaches only to networks declared `internal: true` (no egress) and
+#     never the default bridge — a replica under test cannot reach the real
+#     network;
+#   * it does NOT set privileged, network_mode other than `none`, pid/ipc/uts:
+#     host, userns_mode: host, cap_add, devices, or an unconfined security_opt;
+#   * it does NOT bind-mount the docker socket or a host path (/, /etc, /root,
+#     /var/run, ...); and
+#   * it does NOT publish `ports:` to the host.
+# Everything is torn down with `docker compose down -v` after the run.
 #
 # Replace the image/config below with a faithful copy of the service you own and
 # are reproducing. Never point this at production data.

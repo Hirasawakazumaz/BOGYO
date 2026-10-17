@@ -42,7 +42,7 @@ def test_pipeline_runs_end_to_end_in_dry_run(make_env, tmp_path):
         target="10.0.0.5",
         log_lines=AUTH_LOG,
         replica="10.0.0.5",
-        validations=[("nuclei", ["docker", "run", "--rm", "nuclei"])],
+        validations=[("nuclei", ["docker", "run", "--rm", "--network", "sentinel_sbx_10_0_0_5", "nuclei"])],
         findings=[_finding()],
         patch_backend=RuleBackend(),
         report_md=str(tmp_path / "report.md"),

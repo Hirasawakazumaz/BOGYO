@@ -37,9 +37,20 @@
 - **sandbox/** — `SandboxReplay`: ephemeral, network-isolated (`--internal`) Docker
   Compose replica of an in-scope service. Attack-style validation routes through
   `REDTEAM_ATTACK` + `environment="sandbox"` (hard-refused on production and when the
-  toggle is off); `--privileged` / host-namespace / `--cap-add` are refused; dry-run
-  returns commands; bring-up, each validation, and teardown are all audited and
-  teardown always runs.
+  toggle is off). Isolation is enforced structurally, fail-closed, even in dry-run:
+  - the **compose file is parsed as YAML** (not string-matched) and refused unless
+    every service attaches only to `internal: true` networks (never the default
+    bridge) and opens no escape hatch — `privileged`, host namespaces
+    (`network_mode`/`pid`/`ipc`/`uts`/`userns_mode: host`), `cap_add`, `devices`,
+    unconfined `security_opt`, a docker-socket / host-path bind, or published `ports`;
+  - each **validation command must be bound to the sandbox** (its network or compose
+    project), and a `docker run`/`create` must use `--network <internal net>`, so a
+    validation can never target an arbitrary host;
+  - raw commands are also scanned for `--privileged`, `--net=host` /
+    `--network host`, `--cap-add`, and docker-socket binds.
+
+  dry-run returns commands; bring-up, each validation, and teardown are all audited
+  and teardown always runs.
 - **patch/** — `PatchProposer` generates config-hardening candidates
   (`PATCH_PROPOSE`) via a clean `PatchBackend` interface: a deterministic offline
   `RuleBackend` (default, keeps core testable) and a lazy `AnthropicBackend` that

@@ -64,9 +64,11 @@ relevant toggle in `config/settings.yaml`.
 
 ```bash
 # reproduce a finding in an isolated Docker sandbox (needs enable_sandbox_redteam;
-# sandbox-only, hard-refused on production):
+# sandbox-only, hard-refused on production). The compose file is structurally
+# validated for isolation, and each --validate command must run INSIDE the
+# sandbox (bound to its network/project), never against an arbitrary host:
 sentinel sandbox --replica 10.0.0.5 --compose docker/sandbox.example.compose.yaml \
-  --validate "nuclei=docker run --rm --network sentinel_sbx_10_0_0_5 projectdiscovery/nuclei -u http://web"
+  --validate "nuclei=docker compose -p sentinel_sbx_10_0_0_5 exec -T web nuclei -u http://localhost"
 
 # propose config hardening as a unified diff (apply needs enable_patch_apply + --approve):
 sentinel patch --service sshd --config /etc/ssh/sshd_config

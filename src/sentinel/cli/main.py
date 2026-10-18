@@ -28,7 +28,7 @@ import json as _json
 
 from .. import __version__
 from .. import control
-from ..i18n import LANGUAGES, normalize_lang
+from ..i18n import LANGUAGES, normalize_lang, t
 from ..block import FirewallBlocker
 from ..core import killswitch
 from ..core.audit import AuditLog
@@ -64,6 +64,21 @@ def _print(msg: str) -> None:
     print(msg, flush=True)
 
 
+_LANG = "en"
+
+
+def _detect_lang(settings_path: str) -> str:
+    try:
+        return Settings.load(settings_path).ui.language
+    except Exception:  # noqa: BLE001 - language is best-effort
+        return "en"
+
+
+def tr(key: str, **kw) -> str:
+    s = t(key, _LANG)
+    return s.format(**kw) if kw else s
+
+
 # --------------------------------------------------------------------------- #
 # subcommands
 # --------------------------------------------------------------------------- #
@@ -80,6 +95,8 @@ def cmd_init(args) -> int:
         except EOFError:
             lang = "en"
     lang = normalize_lang(lang or "en")
+    global _LANG
+    _LANG = lang
 
     # Scaffold / update settings.yaml with the chosen language (keeps existing values).
     settings_path = Path(args.settings)
@@ -87,14 +104,15 @@ def cmd_init(args) -> int:
     settings.ui.language = lang
     settings.save(settings_path)
 
-    _print(f"created config/ and state/; consent keypair ready; language = {lang}.")
-    _print(f"wrote {settings_path}. next: edit config/scope.yaml, then `keygen` + `sign-scope` + `consent`.")
+    _print(tr("cli.init.welcome"))
+    _print(tr("cli.init.done", lang=lang))
+    _print(tr("cli.init.next", path=str(settings_path)))
     return 0
 
 
 def cmd_keygen(args) -> int:
     generate_keypair(Path("config/scope.key"), Path("config/scope.pub"))
-    _print("generated scope signing keypair: config/scope.key (keep secret), config/scope.pub")
+    _print(tr("cli.keygen.done"))
     return 0
 
 
@@ -108,7 +126,7 @@ def cmd_sign_scope(args) -> int:
     priv = load_private_key(Path(args.key))
     sig = sign(priv, scope.canonical())
     Path(args.scope + ".sig").write_bytes(sig)
-    _print(f"signed {args.scope} -> {args.scope}.sig  (scope_hash={scope.scope_hash()[:16]}…)")
+    _print(tr("cli.signscope.done", scope=args.scope, h=scope.scope_hash()[:16]))
     return 0
 
 
@@ -120,10 +138,11 @@ def cmd_consent(args) -> int:
     ensure_consent_keypair(settings.paths.consent_file.replace(".signed", ".key"), settings.paths.consent_pubkey_file)
     priv_key = settings.paths.consent_file.replace(".signed", ".key")
 
-    _print("=== Sentinel-Guard operator consent ===")
-    _print(f"scope owner: {scope.owner_name}  org: {scope.owner_org}")
-    _print(f"scope hash : {scope.scope_hash()}")
-    _print("You must accept ALL clauses:\n")
+    _print(tr("cli.consent.title"))
+    _print(tr("cli.consent.intro"))
+    _print(tr("cli.consent.owner", name=scope.owner_name, org=scope.owner_org))
+    _print(tr("cli.consent.hash", h=scope.scope_hash()))
+    _print(tr("cli.consent.accept_all") + "\n")
     for cid, text in REQUIRED_CLAUSES.items():
         _print(f"  [{cid}] {text}\n")
 
@@ -133,14 +152,14 @@ def cmd_consent(args) -> int:
         accepted = list(REQUIRED_CLAUSES.keys())
         phrase = ACCEPT_PHRASE
     else:
-        name = input("operator name: ").strip()
-        org = input("operator org (optional): ").strip()
+        name = input(tr("cli.consent.prompt_name")).strip()
+        org = input(tr("cli.consent.prompt_org")).strip()
         accepted = []
         for cid in REQUIRED_CLAUSES:
-            ans = input(f"accept clause [{cid}]? type 'yes': ").strip().lower()
+            ans = input(tr("cli.consent.prompt_clause", cid=cid)).strip().lower()
             if ans == "yes":
                 accepted.append(cid)
-        _print(f'\nType exactly: {ACCEPT_PHRASE}')
+        _print("\n" + tr("cli.consent.type_phrase", phrase=ACCEPT_PHRASE))
         phrase = input("> ").strip()
 
     record = write_consent(
@@ -152,8 +171,7 @@ def cmd_consent(args) -> int:
         private_key_path=priv_key,
         out_path=settings.paths.consent_file,
     )
-    _print(f"\nconsent signed and saved to {settings.paths.consent_file}")
-    _print(f"bound to scope_hash={record.scope_hash[:16]}…")
+    _print("\n" + tr("cli.consent.saved", path=settings.paths.consent_file, h=record.scope_hash[:16]))
     return 0
 
 
@@ -189,9 +207,9 @@ def cmd_verify(args) -> int:
     verify_consent(settings.paths.consent_file, settings.paths.consent_pubkey_file, scope.scope_hash())
     ok = AuditLog(settings.paths.audit_file).verify_chain()
     if not ok:
-        _print("audit chain TAMPERED")
+        _print(tr("cli.verify.tampered"))
         return 2
-    _print("OK: scope signature, consent, and audit chain all verify.")
+    _print(tr("cli.verify.ok"))
     return 0
 
 
@@ -202,7 +220,7 @@ def cmd_block(args) -> int:
     lines = Path(args.from_logs).read_text(encoding="utf-8", errors="replace").splitlines()
     signals = detect_bruteforce_ips(lines, threshold=args.threshold)
     if not signals:
-        _print("no offending IPs met the threshold.")
+        _print(tr("cli.block.none"))
         return 0
     for sig in signals:
         result = blocker.block_ip(sig.ip, ttl_seconds=args.ttl)
@@ -355,14 +373,14 @@ def cmd_state(args) -> int:
 def cmd_kill(args) -> int:
     settings = _load_settings(args.settings)
     killswitch.engage(settings.paths.killswitch_file, reason=args.reason or "manual")
-    _print(f"kill-switch ENGAGED: {settings.paths.killswitch_file}")
+    _print(tr("cli.kill.engaged", path=settings.paths.killswitch_file))
     return 0
 
 
 def cmd_resume(args) -> int:
     settings = _load_settings(args.settings)
     killswitch.release(settings.paths.killswitch_file)
-    _print("kill-switch released.")
+    _print(tr("cli.kill.released"))
     return 0
 
 
@@ -471,14 +489,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    global _LANG
     args = build_parser().parse_args(argv)
+    _LANG = _detect_lang(getattr(args, "settings", DEFAULT_SETTINGS))
     try:
         return args.func(args)
     except SentinelError as exc:
-        _print(f"REFUSED ({type(exc).__name__}): {exc}")
+        _print(tr("cli.refused", kind=type(exc).__name__, msg=str(exc)))
         return 2
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
-        _print(f"ERROR: {exc}")
+        _print(tr("cli.error", msg=str(exc)))
         return 1
 
 

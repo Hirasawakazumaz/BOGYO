@@ -77,6 +77,12 @@ class IntakeConfig(BaseModel):
         return out
 
 
+class UIConfig(BaseModel):
+    """User-interface preferences (chosen at init; editable via the control API)."""
+
+    language: str = "en"  # "en" | "ja"
+
+
 class GeoConfig(BaseModel):
     """Home location + attacker-IP geolocation for the dashboard world map."""
 
@@ -87,6 +93,9 @@ class GeoConfig(BaseModel):
     enable_geo_lookup: bool = False
     #: Keyless public endpoint; {ip} is substituted. Offline fallback = unknown.
     geo_api_url: str = "http://ip-api.com/json/{ip}?fields=status,countryCode,country,lat,lon"
+    #: Offline, deterministic overrides {ip: ISO2}. Checked before the network, so
+    #: known IPs resolve with no lookup (also powers the offline live demo).
+    static_map: dict[str, str] = Field(default_factory=dict)
 
 
 class UsageConfig(BaseModel):
@@ -127,6 +136,7 @@ class Paths(BaseModel):
 
 class Settings(BaseModel):
     dry_run: bool = True
+    ui: UIConfig = Field(default_factory=UIConfig)
     toggles: Toggles = Field(default_factory=Toggles)
     limits: Limits = Field(default_factory=Limits)
     intake: IntakeConfig = Field(default_factory=IntakeConfig)

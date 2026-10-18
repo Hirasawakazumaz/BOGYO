@@ -16,6 +16,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static, Switch
 
 from ..core.config import Settings
+from ..i18n import t
 from .model import DashboardModel
 from .worldmap import ATK_ACTIVE, ATK_BLOCKED, HOME, LAND, render_grid
 
@@ -134,7 +135,6 @@ class SentinelDashboardApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = "SENTINEL-GUARD // GLOBAL DEFENSE GRID"
         self.action_refresh()
         self.set_interval(self.refresh_interval, self.action_refresh)
 
@@ -144,30 +144,33 @@ class SentinelDashboardApp(App):
     def action_refresh(self) -> None:
         settings = Settings.load(self.settings_path)
         state = DashboardModel(settings).build()
+        lang = state.language
+        self.title = t("app.title", lang)
         self.query_one("#map", Static).update(_map_text(state))
         u = state.usage
         tests = state.tests or {}
+        none_yet = t("lbl.none_yet", lang)
         self.query_one("#status", Static).update(
-            f"[b cyan]DEFENSE STATUS[/]\n"
-            f"blocked IPs : {len(state.blocked_ips)}\nbreaches    : {state.breaches}\n"
-            f"vulns       : {state.vuln_count}\nallow/deny  : {state.allows}/{state.denies}\n"
-            f"tests       : {tests.get('passed','?')}/{tests.get('total','?')}\n"
-            f"audit       : {'INTACT' if state.audit_intact else 'TAMPERED'}"
+            f"[b cyan]{t('panel.status', lang)}[/]\n"
+            f"{t('lbl.blocked_ips', lang)} : {len(state.blocked_ips)}\n{t('lbl.breaches', lang)} : {state.breaches}\n"
+            f"{t('lbl.vulns', lang)} : {state.vuln_count}\n{t('lbl.authorizations', lang)} : {state.allows}/{state.denies}\n"
+            f"{t('lbl.tests', lang)} : {tests.get('passed','?')}/{tests.get('total','?')}\n"
+            f"{t('lbl.audit', lang)} : {'INTACT' if state.audit_intact else 'TAMPERED'}"
         )
         if u:
             self.query_one("#usage", Static).update(
-                f"[b cyan]USAGE GOVERNOR[/]\nprovider: {u.provider}  level: {u.level}\n"
-                f"model   : {u.model}\ntokens  : {u.tokens_today:,}/{u.budget:,}\n"
-                f"{u.bar(24)} {int(u.fraction*100)}%\nruns/hr : {u.runs_per_hour}  "
-                f"run: {'YES' if u.allow_run else 'STOP'}\nresets  : {u.resets_at[:16]}"
+                f"[b cyan]{t('panel.usage', lang)}[/]\n{t('lbl.provider', lang)}: {u.provider}  {t('lbl.level', lang)}: {u.level}\n"
+                f"{t('lbl.model', lang)}: {u.model}\n{t('lbl.tokens_today', lang)}: {u.tokens_today:,}/{u.budget:,}\n"
+                f"{u.bar(24)} {int(u.fraction*100)}%\n{t('lbl.runs_per_hour', lang)}: {u.runs_per_hour}  "
+                f"{t('lbl.run_allowed', lang)}: {'YES' if u.allow_run else 'STOP'}\n{t('lbl.resets', lang)}: {u.resets_at[:16]}"
             )
         self.query_one("#ips", Static).update(
-            "[b cyan]ATTACKER IPs[/]\n" + ("\n".join(
+            f"[b cyan]{t('panel.ips', lang)}[/]\n" + ("\n".join(
                 f"{r['ip']} {r.get('country','??')} {'BLK' if r['blocked'] else 'see'}"
-                for r in state.blocked_ips[:8]) or "(none yet)")
+                for r in state.blocked_ips[:8]) or none_yet)
         )
         self.query_one("#patches", Static).update(
-            "[b cyan]PATCHES[/]\n" + ("\n".join(
+            f"[b cyan]{t('panel.patches', lang)}[/]\n" + ("\n".join(
                 f"{(p.get('path') or '?')} {'(dry)' if p.get('dry_run') else 'APPLIED'}"
-                for p in state.applied_patches[:8]) or "(none yet)")
+                for p in state.applied_patches[:8]) or none_yet)
         )

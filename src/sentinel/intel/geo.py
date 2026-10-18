@@ -55,7 +55,17 @@ def country_centroid(country_code: str) -> Optional[tuple[float, float]]:
 
 
 def lookup_ip(ip: str, config: GeoConfig) -> GeoResult:
-    """Resolve an IP's country. Offline/by-default -> unknown (never fails)."""
+    """Resolve an IP's country. Offline/by-default -> unknown (never fails).
+
+    Order: static_map (offline, deterministic) -> public API (if enabled) -> unknown.
+    """
+    # Offline deterministic overrides win and need no network.
+    cc = config.static_map.get(ip)
+    if cc:
+        centroid = country_centroid(cc)
+        lat, lon = centroid if centroid else (None, None)
+        return GeoResult(ip=ip, country_code=cc.upper(), country=cc.upper(),
+                         lat=lat, lon=lon, ok=centroid is not None)
     if not _is_public(ip):
         return GeoResult(ip=ip, country="Private/Local", ok=False)
     if not config.enable_geo_lookup:

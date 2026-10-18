@@ -5,6 +5,9 @@
 # Master safety switch. Keep true until you have reviewed planned actions.
 dry_run: true
 
+ui:
+  language: en                  # en | ja  (chosen at `sentinel init`; editable via `sentinel config set ui.language ja`)
+
 # Every active capability is opt-in and defaults to false (default-deny).
 toggles:
   enable_blocking: false        # install nftables drop rules for attacker IPs
@@ -41,6 +44,7 @@ geo:                            # dashboard world map
   home_country: JP              # ISO-3166 alpha-2 of the country you defend from
   home_label: HOME
   enable_geo_lookup: false      # opt-in: resolve attacker-IP countries via a keyless public API
+  static_map: {}                # offline overrides {ip: ISO2}, e.g. {"203.0.113.9": "RU"} (checked before the API)
 
 paths:
   scope_file: config/scope.yaml

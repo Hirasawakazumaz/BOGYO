@@ -23,6 +23,7 @@ class DashboardState:
     home_country: str
     home_label: str
     home_latlon: Optional[tuple[float, float]]
+    language: str = "en"
     attackers: list[Marker] = field(default_factory=list)
     blocked_ips: list[dict] = field(default_factory=list)      # {ip, country, blocked}
     applied_patches: list[dict] = field(default_factory=list)  # {path, host, dry_run}
@@ -65,6 +66,7 @@ class DashboardModel:
             home_country=s.geo.home_country,
             home_label=s.geo.home_label,
             home_latlon=home_latlon,
+            language=s.ui.language,
         )
 
         blocked_seen: dict[str, dict] = {}

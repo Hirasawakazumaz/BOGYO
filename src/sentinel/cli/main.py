@@ -24,7 +24,11 @@ import argparse
 import sys
 from pathlib import Path
 
+import json as _json
+
 from .. import __version__
+from .. import control
+from ..i18n import LANGUAGES, normalize_lang
 from ..block import FirewallBlocker
 from ..core import killswitch
 from ..core.audit import AuditLog
@@ -67,8 +71,24 @@ def cmd_init(args) -> int:
     Path("config").mkdir(exist_ok=True)
     Path("state").mkdir(exist_ok=True)
     ensure_consent_keypair("config/consent.key", "config/consent.pub")
-    _print("created config/ and state/; generated consent keypair (config/consent.key).")
-    _print("next: edit config/scope.yaml and settings.yaml, then `sentinel keygen` + `sign-scope` + `consent`.")
+
+    # Language selection (first thing at install): --lang, else prompt, else en.
+    lang = args.lang
+    if not lang:
+        try:
+            lang = input("Choose language / 言語を選択 [en/ja] (en): ").strip()
+        except EOFError:
+            lang = "en"
+    lang = normalize_lang(lang or "en")
+
+    # Scaffold / update settings.yaml with the chosen language (keeps existing values).
+    settings_path = Path(args.settings)
+    settings = Settings.load(settings_path) if settings_path.exists() else Settings()
+    settings.ui.language = lang
+    settings.save(settings_path)
+
+    _print(f"created config/ and state/; consent keypair ready; language = {lang}.")
+    _print(f"wrote {settings_path}. next: edit config/scope.yaml, then `keygen` + `sign-scope` + `consent`.")
     return 0
 
 
@@ -311,6 +331,27 @@ def cmd_usage(args) -> int:
     return 0
 
 
+def cmd_config(args) -> int:
+    settings = _load_settings(args.settings)
+    if args.action == "dump":
+        _print(_json.dumps(control.dump(settings), ensure_ascii=False, indent=2))
+    elif args.action == "get":
+        _print(_json.dumps(control.get_value(settings, args.key), ensure_ascii=False, indent=2))
+    elif args.action == "set":
+        result = control.set_value(settings, args.key, args.value, args.settings)
+        _print(_json.dumps(result, ensure_ascii=False))
+    return 0
+
+
+def cmd_state(args) -> int:
+    settings = _load_settings(args.settings)
+    if args.json:
+        _print(_json.dumps(control.state_dict(settings), ensure_ascii=False, indent=2, default=str))
+    else:
+        _print(render_snapshot(DashboardModel(settings).build()))
+    return 0
+
+
 def cmd_kill(args) -> int:
     settings = _load_settings(args.settings)
     killswitch.engage(settings.paths.killswitch_file, reason=args.reason or "manual")
@@ -337,7 +378,9 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--settings", default=DEFAULT_SETTINGS)
         return sp
 
-    sub.add_parser("init").set_defaults(func=cmd_init)
+    sp = with_settings(sub.add_parser("init", help="scaffold config/state, pick language, make consent keypair"))
+    sp.add_argument("--lang", default="", choices=["", *LANGUAGES], help="UI language (en/ja); prompts if omitted")
+    sp.set_defaults(func=cmd_init)
     sub.add_parser("keygen").set_defaults(func=cmd_keygen)
 
     sp = sub.add_parser("sign-scope")
@@ -403,6 +446,21 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--record", type=int, default=0, help="record N tokens spent (integration/testing)")
     sp.add_argument("--model", default="", help="model label for --record")
     sp.set_defaults(func=cmd_usage)
+
+    # machine-readable control API (read/change everything from another app)
+    sp = with_settings(sub.add_parser("config", help="read/change settings as JSON (control API)"))
+    csub = sp.add_subparsers(dest="action", required=True)
+    csub.add_parser("dump", help="print full settings as JSON")
+    g = csub.add_parser("get", help="print one value as JSON")
+    g.add_argument("key", help="dotted key, e.g. usage.daily_token_budget")
+    s = csub.add_parser("set", help="set + persist one value (JSON or string)")
+    s.add_argument("key")
+    s.add_argument("value")
+    sp.set_defaults(func=cmd_config)
+
+    sp = with_settings(sub.add_parser("state", help="dashboard state (--json for machine-readable)"))
+    sp.add_argument("--json", action="store_true", help="emit the full state as JSON")
+    sp.set_defaults(func=cmd_state)
 
     sp = with_settings(sub.add_parser("kill"))
     sp.add_argument("--reason", default="")

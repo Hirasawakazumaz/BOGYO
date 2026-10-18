@@ -16,27 +16,30 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static, Switch
 
 from ..core.config import Settings
-from ..i18n import t
+from ..i18n import normalize_lang, t
 from .model import DashboardModel
-from .worldmap import ATK_ACTIVE, ATK_BLOCKED, HOME, LAND, render_grid
+from .worldmap import ATK_ACTIVE, ATK_BLOCKED, ARROWS, HOME, is_braille, render_grid
 
-_MAP_STYLE = {
-    LAND: "grey37",
-    HOME: "bold cyan",
-    ATK_BLOCKED: "bold red",
-    ATK_ACTIVE: "bold yellow",
-    "-": "red", "|": "red", "/": "red", "\\": "red",
+_MARKER_STYLE = {
+    HOME: "bold #00e0ff",
+    ATK_BLOCKED: "bold #ff3355",
+    ATK_ACTIVE: "bold #ffd500",
 }
+_ARROW_STYLE = "#ff6a00"
+_LAND_STYLE = "#1f9c4f"  # dim matrix green for coastlines
 
 CYBER_CSS = """
-Screen { background: #04120a; color: #39ff14; }
-#map { color: #39ff14; background: #04120a; border: round #0fae6e; padding: 0 1; }
-.panel { border: round #0fae6e; background: #04120a; color: #7CFFb0; height: auto; }
+Screen { background: #020a06; color: #39ff14; }
+Header { background: #041a0e; color: #00e0ff; text-style: bold; }
+Footer { background: #041a0e; color: #39ff14; }
+#map { color: #39ff14; background: #010704; border: round #0fae6e; padding: 0 1; height: auto; }
+.panel { border: round #0b6; background: #04120a; color: #7CFFb0; height: auto; }
+.wide { width: 1fr; }
 .title { color: #00e0ff; text-style: bold; }
-#statusbar { color: #00e0ff; }
-Button { background: #0b3; color: #04120a; }
+Button { background: #0c7; color: #021; text-style: bold; }
 Input { background: #06230f; color: #39ff14; border: tall #0fae6e; }
 Switch { background: #06230f; }
+Label { color: #7CFFb0; }
 """
 
 
@@ -45,48 +48,70 @@ def _map_text(state) -> Text:
     txt = Text()
     for row in grid:
         for ch in row:
-            style = _MAP_STYLE.get(ch, "")
+            if ch in _MARKER_STYLE:
+                style = _MARKER_STYLE[ch]
+            elif ch in ARROWS:
+                style = _ARROW_STYLE
+            elif is_braille(ch):
+                style = _LAND_STYLE
+            else:
+                style = ""
             txt.append(ch, style=style)
         txt.append("\n")
     return txt
 
 
 class ConfigScreen(Screen):
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
-
     def __init__(self, settings_path: str) -> None:
         super().__init__()
         self.settings_path = settings_path
         self.settings = Settings.load(settings_path)
+        self.lang = self.settings.ui.language
+        self.BINDINGS = [("escape", "app.pop_screen", t("cfg.back", self.lang))]
 
     def compose(self) -> ComposeResult:
         s = self.settings
+        L = self.lang
         yield Header(show_clock=True)
         with VerticalScroll(classes="panel"):
-            yield Label("CONFIG", classes="title")
-            yield Label("Home country (ISO-2)")
-            yield Input(value=s.geo.home_country, id="home_country")
-            yield Label("Home label")
-            yield Input(value=s.geo.home_label, id="home_label")
-            yield Label("Provider (api/cli)")
-            yield Input(value=s.usage.provider, id="provider")
-            yield Label("Daily token budget")
-            yield Input(value=str(s.usage.daily_token_budget), id="budget")
-            yield Label("Base runs/hour")
-            yield Input(value=str(s.usage.base_runs_per_hour), id="rph")
+            yield Label(t("panel.config", L), classes="title")
+            yield Label(t("cfg.hint", L))
+
+            yield Label(f"── {t('cfg.general', L)} ──", classes="title")
+            yield Label(t("cfg.language", L)); yield Input(value=s.ui.language, id="language")
             with Horizontal():
-                yield Label("dry_run")
-                yield Switch(value=s.dry_run, id="dry_run")
+                yield Label(t("cfg.dry_run", L)); yield Switch(value=s.dry_run, id="dry_run")
+            yield Label(t("cfg.home_country", L)); yield Input(value=s.geo.home_country, id="home_country")
+            yield Label(t("cfg.home_label", L)); yield Input(value=s.geo.home_label, id="home_label")
             with Horizontal():
-                yield Label("enable_geo_lookup")
-                yield Switch(value=s.geo.enable_geo_lookup, id="geo")
+                yield Label(t("cfg.geo_lookup", L)); yield Switch(value=s.geo.enable_geo_lookup, id="geo")
+
+            yield Label(f"── {t('cfg.capabilities', L)} ──", classes="title")
             with Horizontal():
-                yield Label("enable_blocking")
-                yield Switch(value=s.toggles.enable_blocking, id="blk")
+                yield Label(t("cap.blocking", L)); yield Switch(value=s.toggles.enable_blocking, id="blk")
             with Horizontal():
-                yield Label("enable_active_scan")
-                yield Switch(value=s.toggles.enable_active_scan, id="scan")
-            yield Button("SAVE", id="save")
+                yield Label(t("cap.active_scan", L)); yield Switch(value=s.toggles.enable_active_scan, id="scan")
+            with Horizontal():
+                yield Label(t("cap.sandbox_redteam", L)); yield Switch(value=s.toggles.enable_sandbox_redteam, id="rt")
+            with Horizontal():
+                yield Label(t("cap.patch_apply", L)); yield Switch(value=s.toggles.enable_patch_apply, id="pa")
+
+            yield Label(f"── {t('cfg.usage', L)} ──", classes="title")
+            yield Label(t("cfg.provider", L)); yield Input(value=s.usage.provider, id="provider")
+            yield Label(t("cfg.daily_budget", L)); yield Input(value=str(s.usage.daily_token_budget), id="budget")
+            yield Label(t("cfg.base_rph", L)); yield Input(value=str(s.usage.base_runs_per_hour), id="rph")
+            yield Label(t("cfg.downgrade_at", L)); yield Input(value=str(s.usage.downgrade_at), id="dg")
+            yield Label(t("cfg.throttle_at", L)); yield Input(value=str(s.usage.throttle_at), id="th")
+            yield Label(t("cfg.stop_at", L)); yield Input(value=str(s.usage.stop_at), id="st")
+
+            yield Label(f"── {t('cfg.limits', L)} ──", classes="title")
+            yield Label(t("cfg.max_targets", L)); yield Input(value=str(s.limits.max_targets_per_run), id="mt")
+            yield Label(t("cfg.rate", L)); yield Input(value=str(s.limits.rate_per_minute), id="rate")
+            yield Label(t("cfg.concurrency", L)); yield Input(value=str(s.limits.max_concurrency), id="cc")
+            yield Label(t("cfg.scan_timeout", L)); yield Input(value=str(s.limits.scan_timeout_seconds), id="to")
+            yield Label(t("cfg.time_window", L)); yield Input(value=s.limits.time_window, id="tw")
+
+            yield Button(t("cfg.save", L), id="save")
             yield Label("", id="msg")
         yield Footer()
 
@@ -94,20 +119,34 @@ class ConfigScreen(Screen):
         if event.button.id != "save":
             return
         s = self.settings
+        q = self.query_one
         try:
-            s.geo.home_country = self.query_one("#home_country", Input).value.strip().upper()[:2]
-            s.geo.home_label = self.query_one("#home_label", Input).value.strip()
-            s.usage.provider = self.query_one("#provider", Input).value.strip() or "api"
-            s.usage.daily_token_budget = int(self.query_one("#budget", Input).value or 0)
-            s.usage.base_runs_per_hour = max(1, int(self.query_one("#rph", Input).value or 1))
-            s.dry_run = self.query_one("#dry_run", Switch).value
-            s.geo.enable_geo_lookup = self.query_one("#geo", Switch).value
-            s.toggles.enable_blocking = self.query_one("#blk", Switch).value
-            s.toggles.enable_active_scan = self.query_one("#scan", Switch).value
+            s.ui.language = normalize_lang(q("#language", Input).value)
+            s.dry_run = q("#dry_run", Switch).value
+            s.geo.home_country = q("#home_country", Input).value.strip().upper()[:2]
+            s.geo.home_label = q("#home_label", Input).value.strip()
+            s.geo.enable_geo_lookup = q("#geo", Switch).value
+            s.toggles.enable_blocking = q("#blk", Switch).value
+            s.toggles.enable_active_scan = q("#scan", Switch).value
+            s.toggles.enable_sandbox_redteam = q("#rt", Switch).value
+            s.toggles.enable_patch_apply = q("#pa", Switch).value
+            s.usage.provider = q("#provider", Input).value.strip() or "api"
+            s.usage.daily_token_budget = max(0, int(q("#budget", Input).value or 0))
+            s.usage.base_runs_per_hour = max(1, int(q("#rph", Input).value or 1))
+            s.usage.downgrade_at = float(q("#dg", Input).value)
+            s.usage.throttle_at = float(q("#th", Input).value)
+            s.usage.stop_at = float(q("#st", Input).value)
+            s.limits.max_targets_per_run = max(1, int(q("#mt", Input).value or 1))
+            s.limits.rate_per_minute = max(1, int(q("#rate", Input).value or 1))
+            s.limits.max_concurrency = max(1, int(q("#cc", Input).value or 1))
+            s.limits.scan_timeout_seconds = max(1, int(q("#to", Input).value or 1))
+            s.limits.time_window = q("#tw", Input).value.strip()
+            # validate as a whole, then persist
+            Settings.model_validate(s.model_dump())
             s.save(self.settings_path)
-            self.query_one("#msg", Label).update("saved ✓")
+            q("#msg", Label).update(t("cfg.saved", self.lang))
         except (ValueError, OSError) as exc:
-            self.query_one("#msg", Label).update(f"error: {exc}")
+            q("#msg", Label).update(f"error: {exc}")
 
 
 class SentinelDashboardApp(App):

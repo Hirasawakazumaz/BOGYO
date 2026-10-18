@@ -35,6 +35,11 @@ class DashboardState:
     tests: Optional[dict] = None                               # {passed, failed, total}
     usage: Optional[GovernorState] = None
     audit_intact: bool = True
+    # settings snapshot for the analysis panel
+    dry_run: bool = True
+    toggles: dict = field(default_factory=dict)
+    limits: dict = field(default_factory=dict)
+    model_tiers: list = field(default_factory=list)
 
 
 def _iter_audit(path: Path):
@@ -67,6 +72,10 @@ class DashboardModel:
             home_label=s.geo.home_label,
             home_latlon=home_latlon,
             language=s.ui.language,
+            dry_run=s.dry_run,
+            toggles=s.toggles.model_dump(),
+            limits=s.limits.model_dump(),
+            model_tiers=list(s.usage.model_tiers),
         )
 
         blocked_seen: dict[str, dict] = {}

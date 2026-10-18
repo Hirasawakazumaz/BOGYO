@@ -5,7 +5,9 @@ from __future__ import annotations
 from sentinel.core.actions import ActionClass
 from sentinel.core.config import GeoConfig
 from sentinel.dashboard import DashboardModel, render_snapshot
-from sentinel.dashboard.worldmap import H, W, Marker, render_grid
+from sentinel.dashboard.worldmap import (
+    ARROWS, ATK_ACTIVE, ATK_BLOCKED, H, HOME, Marker, W, is_braille, render_grid,
+)
 from sentinel.guards import ScopeGuard
 from sentinel.intel.geo import country_centroid, lookup_ip
 
@@ -16,11 +18,11 @@ def test_worldmap_dimensions_and_markers():
     grid = render_grid(home, attackers)
     assert len(grid) == H and all(len(r) == W for r in grid)
     joined = "\n".join(grid)
-    assert "@" in joined  # home
-    assert "x" in joined  # blocked attacker
-    assert "!" in joined  # active attacker
-    # an arrow glyph is drawn somewhere
-    assert any(ch in joined for ch in ("-", "|", "/", "\\"))
+    assert HOME in joined          # home marker
+    assert ATK_BLOCKED in joined   # blocked attacker
+    assert ATK_ACTIVE in joined    # active attacker
+    assert any(a in joined for a in ARROWS)   # a defense arrow is drawn
+    assert any(is_braille(ch) for ch in joined)  # high-res Braille land is rendered
 
 
 def test_geo_private_ip_not_sent_and_disabled_by_default():

@@ -77,6 +77,42 @@ class IntakeConfig(BaseModel):
         return out
 
 
+class GeoConfig(BaseModel):
+    """Home location + attacker-IP geolocation for the dashboard world map."""
+
+    #: ISO-3166 alpha-2 of the country you defend from (e.g. "JP").
+    home_country: str = "JP"
+    home_label: str = "HOME"
+    #: Enable looking up attacker-IP countries via a public geo API (keyless).
+    enable_geo_lookup: bool = False
+    #: Keyless public endpoint; {ip} is substituted. Offline fallback = unknown.
+    geo_api_url: str = "http://ip-api.com/json/{ip}?fields=status,countryCode,country,lat,lon"
+
+
+class UsageConfig(BaseModel):
+    """Claude usage accounting + automatic throttling.
+
+    provider "api": metered Claude API — a daily token budget governs how much
+    runs; as the budget is consumed the governor downgrades the model and lowers
+    run frequency, then stops, resuming when the daily window rolls over.
+    provider "cli": Claude Code CLI subscription — no token metering, but run
+    frequency can still be capped.
+    """
+
+    provider: str = "api"  # "api" (metered) | "cli" (subscription)
+    daily_token_budget: int = Field(default=1_000_000, ge=0)
+    #: Model tiers from most to least capable; the governor steps down these.
+    model_tiers: list[str] = Field(
+        default_factory=lambda: ["claude-opus-4-8", "claude-sonnet-4-8", "claude-haiku-4-8"]
+    )
+    #: Budget fractions at which to downgrade model / halve frequency / stop.
+    downgrade_at: float = Field(default=0.60, ge=0.0, le=1.0)
+    throttle_at: float = Field(default=0.80, ge=0.0, le=1.0)
+    stop_at: float = Field(default=1.0, ge=0.0, le=1.0)
+    #: Baseline runs per hour when not throttled (frequency governor).
+    base_runs_per_hour: int = Field(default=12, ge=1, le=3600)
+
+
 class Paths(BaseModel):
     scope_file: str = "config/scope.yaml"
     scope_sig_file: str = "config/scope.yaml.sig"
@@ -84,6 +120,7 @@ class Paths(BaseModel):
     consent_file: str = "config/consent.signed"
     consent_pubkey_file: str = "config/consent.pub"
     audit_file: str = "state/audit.jsonl"
+    usage_file: str = "state/usage.jsonl"
     killswitch_file: str = "state/KILL"
     state_dir: str = "state"
 
@@ -93,7 +130,18 @@ class Settings(BaseModel):
     toggles: Toggles = Field(default_factory=Toggles)
     limits: Limits = Field(default_factory=Limits)
     intake: IntakeConfig = Field(default_factory=IntakeConfig)
+    usage: UsageConfig = Field(default_factory=UsageConfig)
+    geo: GeoConfig = Field(default_factory=GeoConfig)
     paths: Paths = Field(default_factory=Paths)
+
+    def save(self, path: str | Path) -> None:
+        """Persist settings back to a YAML file (used by the TUI config screen)."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            yaml.safe_dump(self.model_dump(mode="json"), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
 
     @classmethod
     def load(cls, path: str | Path) -> "Settings":

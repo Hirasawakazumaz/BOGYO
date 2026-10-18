@@ -69,8 +69,17 @@
 - **report/** — Markdown+JSON run reports (breach tally, authorizations, applied
   changes, analysis) built purely from the hash-chained audit log; a broken chain is
   flagged.
+- **usage/** — `UsageLedger` + `Governor`: a daily token budget drives automatic model
+  downgrade (tiers) → run-frequency throttle → stop, auto-resuming at local midnight.
+  Provider `api` (metered) or `cli` (subscription; frequency cap only). Pure/offline.
+- **intel/** — `geo`: opt-in IP→country via a keyless public API (private IPs never sent;
+  offline → unknown) plus country centroids for the map.
+- **dashboard/** — `DashboardModel` aggregates the audit log + usage + geo; `worldmap`
+  renders attacker→home arrows; `snapshot` prints a dependency-free CASIO/cyber panel;
+  `app` is the interactive Textual UI (live refresh + in-TUI config editor; `[tui]` extra,
+  imported lazily).
 - **cli/** — operator commands (init, keygen, sign-scope, consent, status, verify,
-  block, scan, sandbox, patch, schedule, report, kill/resume).
+  block, scan, sandbox, patch, schedule, report, usage, dashboard, kill/resume).
 
 ## Execution modes
 - `dry_run: true` (default) — active operations return the exact command/plan and are

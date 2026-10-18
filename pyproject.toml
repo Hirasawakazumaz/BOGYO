@@ -25,6 +25,11 @@ agent = [
     "anthropic>=0.40",
     "requests>=2.31",
 ]
+# Interactive cyber dashboard (TUI). The plain-text snapshot needs none of this.
+tui = [
+    "textual>=0.60",
+    "rich>=13.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",

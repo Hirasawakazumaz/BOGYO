@@ -13,6 +13,8 @@ Subcommands:
   patch        propose config hardening (unified diff); apply needs toggle + approval
   schedule     emit systemd timer + cron for periodic defensive runs (dry-run prints them)
   report       build a Markdown/JSON run report from the audit log
+  dashboard    cyber world-map defense dashboard (TUI; --once prints a snapshot)
+  usage        show the Claude usage governor (budget/model/throttle) state
   kill/resume  engage or release the kill-switch
 """
 
@@ -43,6 +45,9 @@ from ..report import ReportBuilder
 from ..sandbox import SandboxReplay
 from ..scan import Scanner
 from ..schedule import generate as generate_schedule
+from ..dashboard import DashboardModel, render_snapshot, run_app
+from ..usage.governor import Governor
+from ..usage.ledger import UsageLedger
 
 DEFAULT_SETTINGS = "config/settings.yaml"
 
@@ -280,6 +285,31 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_dashboard(args) -> int:
+    settings = _load_settings(args.settings)
+    if args.once:
+        _print(render_snapshot(DashboardModel(settings).build()))
+        return 0
+    run_app(args.settings)  # interactive Textual UI (needs [tui] extra)
+    return 0
+
+
+def cmd_usage(args) -> int:
+    settings = _load_settings(args.settings)
+    gov = Governor(settings.usage, UsageLedger(settings.paths.usage_file))
+    if args.record:
+        gov.ledger.record(args.record, model=args.model, op="manual")
+    st = gov.state()
+    _print(f"provider      : {st.provider}")
+    _print(f"tokens today  : {st.tokens_today:,} / {st.budget:,}  {st.bar()} {int(st.fraction*100)}%")
+    _print(f"level         : {st.level}")
+    _print(f"model (gov)   : {st.model}")
+    _print(f"runs/hour     : {st.runs_per_hour}")
+    _print(f"run allowed   : {'YES' if st.allow_run else 'NO (budget reached — resumes after reset)'}")
+    _print(f"resets at     : {st.resets_at}")
+    return 0
+
+
 def cmd_kill(args) -> int:
     settings = _load_settings(args.settings)
     killswitch.engage(settings.paths.killswitch_file, reason=args.reason or "manual")
@@ -363,6 +393,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--md", default=None, help="also write Markdown to this path")
     sp.add_argument("--json", default=None, help="also write JSON to this path")
     sp.set_defaults(func=cmd_report)
+
+    sp = with_settings(sub.add_parser("dashboard", help="cyber world-map defense dashboard (TUI; --once for a snapshot)"))
+    sp.add_argument("--once", action="store_true", help="print one plain-text snapshot and exit (no TUI deps)")
+    sp.set_defaults(func=cmd_dashboard)
+
+    sp = with_settings(sub.add_parser("usage", help="show Claude usage governor state; --record adds tokens"))
+    sp.add_argument("--record", type=int, default=0, help="record N tokens spent (integration/testing)")
+    sp.add_argument("--model", default="", help="model label for --record")
+    sp.set_defaults(func=cmd_usage)
 
     sp = with_settings(sub.add_parser("kill"))
     sp.add_argument("--reason", default="")

@@ -78,18 +78,30 @@ sentinel schedule --command "block --from-logs /var/log/auth.log" --on-calendar 
 
 # build a run report from the audit log:
 sentinel report --md run.md --json run.json
+
+# Claude usage governor (daily token budget -> auto model-downgrade / throttle / stop):
+sentinel usage                      # show budget bar, chosen model, run/stop state
+sentinel usage --record 650000 --model claude-opus-4-8
+
+# cyber "global defense grid" dashboard (world map + attacker->home arrows):
+sentinel dashboard --once           # plain-text snapshot (no extra deps)
+sentinel dashboard                  # interactive Textual UI (needs ".[tui]"), press 'c' to edit config
 ```
 
 ## Status
 
 Implemented: safety core (scope/consent/audit/kill-switch/guard), defensive IP blocking,
-scan orchestration, passive CVE lookup, **Docker sandbox replay**, **patch generation +
-sandbox conflict-evaluation loop**, **LangGraph orchestration** (lazy; offline-safe),
-**systemd/cron scheduling**, **audit-log run reports**, CLI, and test suite.
+scan orchestration, passive CVE lookup, **Docker sandbox replay** (isolation enforced by
+structural compose analysis), **patch generation + sandbox conflict-evaluation loop**,
+**LangGraph orchestration** (lazy; offline-safe), **systemd/cron scheduling**, **audit-log
+run reports**, a **Claude usage governor** (daily token budget drives automatic model
+downgrade → frequency throttle → stop, auto-resume at midnight; `api` metered or `cli`
+subscription), a **cyber world-map TUI dashboard** (attacker→home arrows, live panels, and
+an in-TUI config editor), CLI, and test suite (75 passing).
 
-The LangGraph brain and LLM patch generation need the optional extra
-(`pip install -e ".[agent]"`); everything else, including the full pipeline in dry-run,
-runs without it.
+Optional extras: the LangGraph brain & LLM patch generation need `pip install -e ".[agent]"`;
+the interactive dashboard needs `pip install -e ".[tui]"`. Everything else — including the
+full pipeline in dry-run and the plain-text dashboard snapshot — runs without either.
 
 ## Out of scope (by design)
 

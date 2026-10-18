@@ -25,6 +25,23 @@ intake:
   threatintel_api_env:          # provider -> env var holding the key
     abuseipdb: ABUSEIPDB_API_KEY
 
+usage:                          # Claude usage governor (auto model-downgrade/throttle/stop)
+  provider: api                 # "api" (metered, daily token budget) | "cli" (subscription)
+  daily_token_budget: 1000000   # api only; governor steps down as this fills, resets at midnight
+  model_tiers:                  # most -> least capable; governor steps down these
+    - claude-opus-4-8
+    - claude-sonnet-4-8
+    - claude-haiku-4-8
+  downgrade_at: 0.60            # budget fraction to downgrade the model
+  throttle_at: 0.80             # fraction to quarter the run frequency
+  stop_at: 1.0                  # fraction to stop until the daily reset
+  base_runs_per_hour: 12
+
+geo:                            # dashboard world map
+  home_country: JP              # ISO-3166 alpha-2 of the country you defend from
+  home_label: HOME
+  enable_geo_lookup: false      # opt-in: resolve attacker-IP countries via a keyless public API
+
 paths:
   scope_file: config/scope.yaml
   scope_sig_file: config/scope.yaml.sig
@@ -32,5 +49,6 @@ paths:
   consent_file: config/consent.signed
   consent_pubkey_file: config/consent.pub
   audit_file: state/audit.jsonl
+  usage_file: state/usage.jsonl
   killswitch_file: state/KILL
   state_dir: state

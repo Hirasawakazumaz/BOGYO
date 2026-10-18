@@ -18,6 +18,7 @@ from textual.widgets import Button, Footer, Header, Input, Label, Static, Switch
 from ..core.config import Settings
 from ..i18n import normalize_lang, t
 from .model import DashboardModel
+from .snapshot import _attack_graph
 from .worldmap import ATK_ACTIVE, ATK_BLOCKED, ARROWS, HOME, is_braille, render_grid
 
 _MARKER_STYLE = {
@@ -166,11 +167,17 @@ class SentinelDashboardApp(App):
         yield Header(show_clock=True)
         yield Static(id="map", classes="panel")
         with Horizontal():
+            yield Static(id="activity", classes="panel wide")
+            yield Static(id="attack", classes="panel wide")
+        with Horizontal():
             yield Static(id="status", classes="panel")
             yield Static(id="usage", classes="panel")
         with Horizontal():
             yield Static(id="ips", classes="panel")
+            yield Static(id="pending", classes="panel")
+        with Horizontal():
             yield Static(id="patches", classes="panel")
+            yield Static(id="logs", classes="panel")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -212,4 +219,27 @@ class SentinelDashboardApp(App):
             f"[b cyan]{t('panel.patches', lang)}[/]\n" + ("\n".join(
                 f"{(p.get('path') or '?')} {'(dry)' if p.get('dry_run') else 'APPLIED'}"
                 for p in state.applied_patches[:8]) or none_yet)
+        )
+        # current activity
+        act = t(f"act.{state.current_activity}", lang)
+        if act == f"act.{state.current_activity}":
+            act = state.current_activity
+        detail = f"  →  {state.current_detail}" if state.current_detail else ""
+        self.query_one("#activity", Static).update(
+            f"[b cyan]{t('panel.activity', lang)}[/]\n[b #39ff14]▶ {act}[/]{detail}"
+        )
+        # attack graph
+        graph = "\n".join(_attack_graph(state.attack_series, 40))
+        self.query_one("#attack", Static).update(
+            f"[b cyan]{t('panel.attack_graph', lang)}[/]\n[#ff6a00]{graph}[/]"
+        )
+        # pending patches
+        self.query_one("#pending", Static).update(
+            f"[b cyan]{t('panel.pending', lang)}[/]\n" + ("\n".join(
+                f"{p.get('service','?')} {p.get('finding','?')} x{p.get('candidates',1)}"
+                for p in state.pending_patches[:8]) or none_yet)
+        )
+        # live log
+        self.query_one("#logs", Static).update(
+            f"[b cyan]{t('panel.logs', lang)}[/]\n" + ("\n".join(state.recent_logs[-8:]) or none_yet)
         )

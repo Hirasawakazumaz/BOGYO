@@ -21,7 +21,7 @@ def test_worldmap_dimensions_and_markers():
     assert HOME in joined          # home marker
     assert ATK_BLOCKED in joined   # blocked attacker
     assert ATK_ACTIVE in joined    # active attacker
-    assert any(a in joined for a in ARROWS)   # a defense arrow is drawn
+    assert all(a not in joined for a in ARROWS)  # arrows removed by design (markers only)
     assert any(is_braille(ch) for ch in joined)  # high-res Braille land is rendered
 
 

@@ -8,8 +8,42 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+ATTACK_BINS = 24
+ATTACK_BUCKET_SECONDS = 15
+
+
+def _short(data: dict) -> str:
+    for k in ("ip", "target", "path", "replica", "host", "finding"):
+        if data.get(k):
+            return str(data[k])
+    return ""
+
+
+def _parse_ts(ts: str) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return None
+
+
+def _bucketize(times: list[datetime]) -> list[int]:
+    """Counts of block events over the last ATTACK_BINS windows (old -> new)."""
+    if not times:
+        return [0] * ATTACK_BINS
+    now = max(times[-1], datetime.now(times[-1].tzinfo))
+    series = [0] * ATTACK_BINS
+    span = ATTACK_BINS * ATTACK_BUCKET_SECONDS
+    for t in times:
+        age = (now - t).total_seconds()
+        if 0 <= age < span:
+            idx = ATTACK_BINS - 1 - int(age // ATTACK_BUCKET_SECONDS)
+            if 0 <= idx < ATTACK_BINS:
+                series[idx] += 1
+    return series
 
 from ..core.config import Settings
 from ..intel.geo import country_centroid, lookup_ip
@@ -40,6 +74,12 @@ class DashboardState:
     toggles: dict = field(default_factory=dict)
     limits: dict = field(default_factory=dict)
     model_tiers: list = field(default_factory=list)
+    # live activity
+    current_activity: str = "idle"                             # event name (mapped to i18n)
+    current_detail: str = ""
+    recent_logs: list[str] = field(default_factory=list)       # formatted lines, newest last
+    pending_patches: list[dict] = field(default_factory=list)  # proposed, not yet applied
+    attack_series: list[int] = field(default_factory=list)     # blocks per time bucket (old->new)
 
 
 def _iter_audit(path: Path):
@@ -80,13 +120,21 @@ class DashboardModel:
 
         blocked_seen: dict[str, dict] = {}
         patches: list[dict] = []
+        proposed: list[dict] = []
+        applied_paths: set[str] = set()
         vulns = 0
         audit_intact = True
+        block_times: list[datetime] = []
+        recent: list[str] = []
+        last_event: tuple[str, dict] = ("", {})
         for e, chain_ok in _iter_audit(Path(s.paths.audit_file)):
             if not chain_ok:
                 audit_intact = False
             ev = e.get("event", "")
             data = e.get("data", {})
+            ts = e.get("ts", "")
+            last_event = (ev, data)
+            recent.append(f"{ts[11:19]} {ev} {_short(data)}")
             if ev == "authorize.allow":
                 state.allows += 1
             elif ev == "authorize.deny":
@@ -94,12 +142,21 @@ class DashboardModel:
             elif ev in ("block.apply", "block.plan"):
                 ip = data.get("ip")
                 if ip:
-                    # applied => truly blocked (x); planned/dry-run => still active (!)
                     blocked_seen[ip] = {"ip": ip, "blocked": ev == "block.apply"}
+                dt = _parse_ts(ts)
+                if dt:
+                    block_times.append(dt)
             elif ev in ("patch.apply", "patch.apply.plan"):
-                patches.append({"path": data.get("path"), "host": data.get("host"), "dry_run": ev.endswith(".plan")})
-            elif ev in ("patch.propose",):
-                state.proposed_patches += int(data.get("candidates", 0))
+                path = data.get("path")
+                patches.append({"path": path, "host": data.get("host"), "dry_run": ev.endswith(".plan")})
+                if path:
+                    applied_paths.add(path)
+            elif ev == "patch.propose":
+                n = int(data.get("candidates", 0))
+                state.proposed_patches += n
+                if n:
+                    proposed.append({"finding": data.get("finding", "?"), "service": data.get("service", "?"),
+                                     "path": data.get("path"), "candidates": n})
             elif ev == "cve.lookup":
                 vulns += int(data.get("found", 0))
             elif ev == "sandbox.validate" and data.get("breached"):
@@ -108,6 +165,11 @@ class DashboardModel:
         state.audit_intact = audit_intact
         state.vuln_count = vulns
         state.applied_patches = patches
+        state.pending_patches = [p for p in proposed if not (p.get("path") and p["path"] in applied_paths)][-8:]
+        state.recent_logs = recent[-10:]
+        state.current_activity = last_event[0] or "idle"
+        state.current_detail = _short(last_event[1])
+        state.attack_series = _bucketize(block_times)
 
         # Geolocate blocked IPs (only if enabled; offline -> no marker, still listed).
         for ip, rec in blocked_seen.items():

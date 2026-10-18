@@ -45,6 +45,14 @@ def render_snapshot(state: DashboardState) -> str:
     )
     lines += _box(map_title, grid, width)
 
+    # current activity + attack graph
+    act = t(f"act.{state.current_activity}", lang)
+    if t(f"act.{state.current_activity}", lang) == f"act.{state.current_activity}":
+        act = state.current_activity  # unknown event -> raw name
+    detail = f"  →  {state.current_detail}" if state.current_detail else ""
+    lines += _box(t("panel.activity", lang), [f"▶ {act}{detail}"], width)
+    lines += _box(t("panel.attack_graph", lang), _attack_graph(state.attack_series, width - 6), width)
+
     # stats
     u = state.usage
     tests = state.tests or {}
@@ -79,7 +87,28 @@ def render_snapshot(state: DashboardState) -> str:
                    for p in state.applied_patches[:6]] or [none_yet]
     lines += _box(t("panel.patches", lang), patch_lines, width)
 
+    # pending patches (proposed, awaiting apply)
+    pend_lines = [f"{p.get('service','?'):<10} {p.get('finding','?'):<12} x{p.get('candidates',1)}"
+                  for p in state.pending_patches[:6]] or [none_yet]
+    lines += _box(t("panel.pending", lang), pend_lines, width)
+
+    # live log tail
+    log_lines = list(state.recent_logs[-8:]) or [none_yet]
+    lines += _box(t("panel.logs", lang), log_lines, width)
+
     return "\n".join(lines)
+
+
+_SPARK = "▁▂▃▄▅▆▇█"
+
+
+def _attack_graph(series: list[int], span: int) -> list[str]:
+    s = (series or [0])[-span:]
+    peak = max(s) if s else 0
+    if peak <= 0:
+        return ["▁" * len(s) + f"   peak 0"]
+    bars = "".join(_SPARK[min(len(_SPARK) - 1, int(v / peak * (len(_SPARK) - 1)))] for v in s)
+    return [bars, f"peak {peak}/bucket   total {sum(s)}"]
 
 
 def _indicator(on: bool) -> str:

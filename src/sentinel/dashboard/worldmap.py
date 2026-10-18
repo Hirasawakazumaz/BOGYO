@@ -160,17 +160,12 @@ def _draw_arrow(grid: list[list[str]], x0: int, y0: int, x1: int, y1: int) -> No
 
 
 def render_grid(home: Optional[tuple[float, float]], attackers: list[Marker]) -> list[str]:
+    """Markers only (no arrows): ✖ blocked / ▲ active attackers, ◉ home."""
     grid = _base_cells()
-    hx = hy = None
-    if home is not None:
-        hx, hy = project(home[0], home[1])
-    for mk in attackers:
-        ax, ay = project(mk.lat, mk.lon)
-        if hx is not None and (ax, ay) != (hx, hy):
-            _draw_arrow(grid, ax, ay, hx, hy)
     for mk in attackers:
         ax, ay = project(mk.lat, mk.lon)
         grid[ay][ax] = ATK_BLOCKED if mk.blocked else ATK_ACTIVE
-    if hx is not None:
+    if home is not None:
+        hx, hy = project(home[0], home[1])
         grid[hy][hx] = HOME
     return ["".join(row) for row in grid]

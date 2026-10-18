@@ -26,7 +26,18 @@ devices, unconfined security_opt, host namespaces, privileged, published ports);
 commands must be bound to the sandbox network.
 
 ## Status (as of 2026-10-18)
-Branch `main`, all tests green: **75 passed**. Commits on top of v0.1 (`60ff6b9`):
+Branch `main`, all tests green: **85 passed**. Latest additions:
+- Real Anthropic token accounting wired into the usage Governor (`d292219`): budget
+  picks the model tier and stops/resumes; offline rule fallback when stopped.
+- i18n (en/ja) chosen at `sentinel init` (`ui.language`) + a machine-readable control
+  API `sentinel config dump|get|set` and `sentinel state --json` so other apps can read
+  and change every display/settings item (`4a0be38`). `geo.static_map {ip: ISO2}` gives
+  offline deterministic IP→country (also powers the offline live demo).
+- **Live demo** (separate path, NOT in the repo): `a separate local demo directory` —
+  `bash setup_demo.sh`, then `bash run_feed.sh` (terminal A) + `bash run_dashboard.sh`
+  (terminal B). See its `README_DEMO.md`.
+
+Commits on top of v0.1 (`60ff6b9`):
 - `6986dd3` sandbox replay (Phase 4)
 - `3b66780` patch proposer + conflict-eval loop (Phase 5)
 - `a175fb7` graph/schedule/report (Phase 6)

@@ -244,7 +244,8 @@ def cmd_patch(args) -> int:
         path=args.config,
         original=original,
     )
-    candidates = PatchProposer(guard, default_backend()).propose(finding)
+    gov = Governor(settings.usage, UsageLedger(settings.paths.usage_file))
+    candidates = PatchProposer(guard, default_backend(governor=gov)).propose(finding)
     if not candidates:
         _print(f"no hardening candidate for service {args.service!r} / {args.config}")
         return 0

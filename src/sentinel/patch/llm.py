@@ -103,9 +103,17 @@ class AnthropicBackend:
         "attack payloads, or anything that weakens security."
     )
 
-    def __init__(self, model: str = "claude-opus-4-8", api_key_env: str = "ANTHROPIC_API_KEY") -> None:
+    def __init__(
+        self,
+        model: str = "claude-opus-4-8",
+        api_key_env: str = "ANTHROPIC_API_KEY",
+        governor=None,
+    ) -> None:
         self.model = model
         self.api_key_env = api_key_env
+        #: Optional sentinel.usage.Governor — picks the model from the remaining
+        #: budget, gates calls when stopped, and records real token spend.
+        self.governor = governor
         self._fallback = RuleBackend()
 
     def _client(self):
@@ -116,19 +124,33 @@ class AnthropicBackend:
             raise RuntimeError(f"{self.api_key_env} not set")
         return anthropic.Anthropic(api_key=key)
 
-    def _ask(self, finding: Finding, extra: str = "") -> list[PatchCandidate]:
+    def _effective_model(self) -> str:
+        """Let the usage governor choose the tier when it is metering (provider api)."""
+        if self.governor is not None and getattr(self.governor.config, "provider", "api") == "api":
+            return self.governor.state().model
+        return self.model
+
+    def _budget_allows(self) -> bool:
+        if self.governor is None:
+            return True
+        return self.governor.state().allow_run
+
+    def _ask(self, finding: Finding, op: str, extra: str = "") -> list[PatchCandidate]:
         client = self._client()
+        model = self._effective_model()
         prompt = (
             f"Service: {finding.service}\nFinding: {finding.title}\n{finding.detail}\n"
             f"{extra}\n--- current {finding.path} ---\n{finding.original}\n"
             "Return the hardened file content only."
         )
         msg = client.messages.create(
-            model=self.model,
+            model=model,
             max_tokens=2048,
             system=self.SYSTEM,
             messages=[{"role": "user", "content": prompt}],
         )
+        # Record REAL token spend from the API response usage block.
+        self._record_usage(msg, model, op)
         hardened = "".join(getattr(b, "text", "") for b in msg.content).strip() + "\n"
         if not hardened.strip() or hardened == finding.original:
             return []
@@ -137,16 +159,27 @@ class AnthropicBackend:
                 finding_id=finding.id,
                 service=finding.service,
                 path=finding.path,
-                rationale=f"LLM hardening ({self.model})",
+                rationale=f"LLM hardening ({model})",
                 original=finding.original,
                 hardened=hardened,
                 changes=["llm-generated hardening"],
             )
         ]
 
+    def _record_usage(self, msg, model: str, op: str) -> None:
+        if self.governor is None:
+            return
+        usage = getattr(msg, "usage", None)
+        in_t = int(getattr(usage, "input_tokens", 0) or 0)
+        out_t = int(getattr(usage, "output_tokens", 0) or 0)
+        self.governor.record(in_t + out_t, model=model, op=op)
+
     def propose(self, finding: Finding) -> list[PatchCandidate]:
+        if not self._budget_allows():
+            # daily token budget reached — stay offline until the governor resets
+            return self._fallback.propose(finding)
         try:
-            cands = self._ask(finding)
+            cands = self._ask(finding, op="patch.propose")
             return cands or self._fallback.propose(finding)
         except Exception:  # noqa: BLE001 - never let the LLM break the loop
             return self._fallback.propose(finding)
@@ -154,16 +187,22 @@ class AnthropicBackend:
     def refine(
         self, finding: Finding, candidate: PatchCandidate, conflicts: list[str]
     ) -> list[PatchCandidate]:
+        if not self._budget_allows():
+            return self._fallback.refine(finding, candidate, conflicts)
         extra = f"The previous candidate caused these conflicts: {', '.join(conflicts)}. Be more conservative."
         try:
-            cands = self._ask(finding, extra)
+            cands = self._ask(finding, op="patch.refine", extra=extra)
             return cands or self._fallback.refine(finding, candidate, conflicts)
         except Exception:  # noqa: BLE001
             return self._fallback.refine(finding, candidate, conflicts)
 
 
-def default_backend() -> PatchBackend:
-    """Pick the LLM backend if a key is present, else the deterministic rules."""
+def default_backend(governor=None) -> PatchBackend:
+    """Pick the LLM backend if a key is present, else the deterministic rules.
+
+    Pass a ``sentinel.usage.Governor`` to meter real token spend and let the daily
+    budget drive model selection and stop/resume.
+    """
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicBackend()
+        return AnthropicBackend(governor=governor)
     return RuleBackend()

@@ -51,4 +51,5 @@ def test_dashboard_aggregates_audit(make_env):
     snap = render_snapshot(state)
     assert "GLOBAL DEFENSE GRID" in snap
     assert "USAGE GOVERNOR" in snap
-    assert "WORLD MAP" in snap
+    assert "PATCH PIPELINE" in snap       # new ops screen (world map removed)
+    assert "SECURITY BLOCKS" in snap

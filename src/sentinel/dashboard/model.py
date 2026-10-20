@@ -15,6 +15,16 @@ from typing import Optional
 ATTACK_BINS = 24
 ATTACK_BUCKET_SECONDS = 15
 
+_STAGE_FOR = {
+    "block.apply": "intake", "block.plan": "intake", "authorize.allow": "intake",
+    "scan.plan": "scan", "scan.run": "scan", "cve.lookup": "scan",
+    "sandbox.up.plan": "sandbox", "sandbox.up": "sandbox",
+    "sandbox.validate": "sandbox", "sandbox.validate.plan": "sandbox",
+    "patch.propose": "propose", "patch.refine": "propose",
+    "patch.evaluate": "eval",
+    "patch.apply": "apply", "patch.apply.plan": "apply",
+}
+
 
 def _short(data: dict) -> str:
     for k in ("ip", "target", "path", "replica", "host", "finding"):
@@ -77,9 +87,13 @@ class DashboardState:
     # live activity
     current_activity: str = "idle"                             # event name (mapped to i18n)
     current_detail: str = ""
+    pipeline_stage: str = ""                                   # intake|scan|sandbox|propose|eval|apply
     recent_logs: list[str] = field(default_factory=list)       # formatted lines, newest last
     pending_patches: list[dict] = field(default_factory=list)  # proposed, not yet applied
     attack_series: list[int] = field(default_factory=list)     # blocks per time bucket (old->new)
+    sandbox_recent: list[dict] = field(default_factory=list)   # recent docker validations
+    blocks_today: int = 0
+    blocks_month: int = 0
 
 
 def _iter_audit(path: Path):
@@ -126,6 +140,7 @@ class DashboardModel:
         audit_intact = True
         block_times: list[datetime] = []
         recent: list[str] = []
+        sandbox_recent: list[dict] = []
         last_event: tuple[str, dict] = ("", {})
         for e, chain_ok in _iter_audit(Path(s.paths.audit_file)):
             if not chain_ok:
@@ -159,8 +174,13 @@ class DashboardModel:
                                      "path": data.get("path"), "candidates": n})
             elif ev == "cve.lookup":
                 vulns += int(data.get("found", 0))
-            elif ev == "sandbox.validate" and data.get("breached"):
-                state.breaches += 1
+            elif ev in ("sandbox.validate", "sandbox.validate.plan"):
+                sandbox_recent.append({
+                    "name": data.get("name", "?"), "replica": data.get("replica", "?"),
+                    "breached": bool(data.get("breached")), "planned": ev.endswith(".plan"),
+                })
+                if ev == "sandbox.validate" and data.get("breached"):
+                    state.breaches += 1
 
         state.audit_intact = audit_intact
         state.vuln_count = vulns
@@ -169,7 +189,14 @@ class DashboardModel:
         state.recent_logs = recent[-10:]
         state.current_activity = last_event[0] or "idle"
         state.current_detail = _short(last_event[1])
+        state.pipeline_stage = _STAGE_FOR.get(last_event[0], "")
         state.attack_series = _bucketize(block_times)
+        state.sandbox_recent = sandbox_recent[-6:]
+        now = datetime.now().astimezone()
+        today = now.strftime("%Y-%m-%d")
+        month = now.strftime("%Y-%m")
+        state.blocks_today = sum(1 for t_ in block_times if t_.astimezone().strftime("%Y-%m-%d") == today)
+        state.blocks_month = sum(1 for t_ in block_times if t_.astimezone().strftime("%Y-%m") == month)
 
         # Geolocate blocked IPs (only if enabled; offline -> no marker, still listed).
         for ip, rec in blocked_seen.items():

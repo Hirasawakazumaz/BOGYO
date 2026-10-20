@@ -11,9 +11,11 @@ from datetime import datetime
 
 from ..i18n import t
 from .model import DashboardState
-from .worldmap import ATK_ACTIVE, ATK_BLOCKED, HOME, W, render_grid
 
+PANEL_W = 78
 _TL, _TR, _BL, _BR, _H, _V = "╔", "╗", "╚", "╝", "═", "║"
+_STAGES = ["intake", "scan", "sandbox", "propose", "eval", "apply"]
+_SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
 def _box(title: str, lines: list[str], width: int) -> list[str]:
@@ -26,9 +28,9 @@ def _box(title: str, lines: list[str], width: int) -> list[str]:
     return out
 
 
-def render_snapshot(state: DashboardState) -> str:
+def render_snapshot(state: DashboardState, frame: int = 0) -> str:
     lang = state.language
-    width = W + 4
+    width = PANEL_W + 4
     clock = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     lines: list[str] = []
     lines.append("")
@@ -36,22 +38,23 @@ def render_snapshot(state: DashboardState) -> str:
     lines.append(f"{clock}".center(width))
     lines.append("")
 
-    # world map
-    grid = render_grid(state.home_latlon, state.attackers)
-    home_tag = f"{state.home_label}({state.home_country})"
-    map_title = (
-        f"{t('panel.worldmap', lang)}  {HOME}={home_tag}  "
-        f"{ATK_BLOCKED}={t('lbl.blocked', lang)}  {ATK_ACTIVE}={t('lbl.active', lang)}"
-    )
-    lines += _box(map_title, grid, width)
-
-    # current activity + attack graph
+    # current activity + animated patch pipeline
     act = t(f"act.{state.current_activity}", lang)
-    if t(f"act.{state.current_activity}", lang) == f"act.{state.current_activity}":
+    if act == f"act.{state.current_activity}":
         act = state.current_activity  # unknown event -> raw name
     detail = f"  →  {state.current_detail}" if state.current_detail else ""
     lines += _box(t("panel.activity", lang), [f"▶ {act}{detail}"], width)
+    lines += _box(t("panel.pipeline", lang), pipeline_lines(state.pipeline_stage, frame, lang), width)
+
+    # docker sandbox (attack validation) + attack graph
+    lines += _box(t("panel.sandbox", lang), _sandbox_lines(state, lang), width)
     lines += _box(t("panel.attack_graph", lang), _attack_graph(state.attack_series, width - 6), width)
+
+    # security block stats
+    lines += _box(t("panel.blockstats", lang), [
+        f"{t('lbl.today', lang)}: {state.blocks_today:<6} {t('lbl.month', lang)}: {state.blocks_month:<6} "
+        f"IP: {len(state.blocked_ips)}"
+    ], width)
 
     # stats
     u = state.usage
@@ -97,6 +100,40 @@ def render_snapshot(state: DashboardState) -> str:
     lines += _box(t("panel.logs", lang), log_lines, width)
 
     return "\n".join(lines)
+
+
+def pipeline_lines(stage: str, frame: int, lang: str) -> list[str]:
+    """Animated patch-creation pipeline: ✓ done · future, spinner on active stage,
+    plus a moving flow marker for an 'anime' feel (frame advances each tick)."""
+    active = _STAGES.index(stage) if stage in _STAGES else -1
+    spin = _SPINNER[frame % len(_SPINNER)]
+    parts = []
+    for i, st in enumerate(_STAGES):
+        if active < 0:
+            mark = "·"
+        elif i < active:
+            mark = "✓"
+        elif i == active:
+            mark = spin
+        else:
+            mark = "·"
+        parts.append(f"{mark} {t('stage.' + st, lang)}")
+    track = 52
+    pos = frame % track if active >= 0 else 0
+    flow = "·" * pos + "►" + "·" * (track - pos - 1) if active >= 0 else "·" * track
+    return ["   ".join(parts), flow]
+
+
+def _sandbox_lines(state: DashboardState, lang: str) -> list[str]:
+    if not state.sandbox_recent:
+        return [t("sandbox.idle", lang)]
+    out = []
+    for v in state.sandbox_recent[-6:]:
+        status = (t("sandbox.planned", lang) if v.get("planned")
+                  else t("sandbox.breach", lang) if v.get("breached")
+                  else t("sandbox.clean", lang))
+        out.append(f"{v.get('name','?'):<16} @ {v.get('replica','?'):<16} [{status}]")
+    return out
 
 
 _SPARK = "▁▂▃▄▅▆▇█"

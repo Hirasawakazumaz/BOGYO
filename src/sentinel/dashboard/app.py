@@ -18,22 +18,13 @@ from textual.widgets import Button, Footer, Header, Input, Label, Static, Switch
 from ..core.config import Settings
 from ..i18n import normalize_lang, t
 from .model import DashboardModel
-from .snapshot import _attack_graph
-from .worldmap import ATK_ACTIVE, ATK_BLOCKED, ARROWS, HOME, is_braille, render_grid
-
-_MARKER_STYLE = {
-    HOME: "bold #00e0ff",
-    ATK_BLOCKED: "bold #ff3355",
-    ATK_ACTIVE: "bold #ffd500",
-}
-_ARROW_STYLE = "#ff6a00"
-_LAND_STYLE = "#1f9c4f"  # dim matrix green for coastlines
+from .snapshot import _attack_graph, pipeline_lines
 
 CYBER_CSS = """
 Screen { background: #020a06; color: #39ff14; }
 Header { background: #041a0e; color: #00e0ff; text-style: bold; }
 Footer { background: #041a0e; color: #39ff14; }
-#map { color: #39ff14; background: #010704; border: round #0fae6e; padding: 0 1; height: auto; }
+#pipeline { color: #ffd500; background: #010704; border: round #0fae6e; padding: 0 1; height: auto; }
 .panel { border: round #0b6; background: #04120a; color: #7CFFb0; height: auto; }
 .wide { width: 1fr; }
 .title { color: #00e0ff; text-style: bold; }
@@ -42,24 +33,6 @@ Input { background: #06230f; color: #39ff14; border: tall #0fae6e; }
 Switch { background: #06230f; }
 Label { color: #7CFFb0; }
 """
-
-
-def _map_text(state) -> Text:
-    grid = render_grid(state.home_latlon, state.attackers)
-    txt = Text()
-    for row in grid:
-        for ch in row:
-            if ch in _MARKER_STYLE:
-                style = _MARKER_STYLE[ch]
-            elif ch in ARROWS:
-                style = _ARROW_STYLE
-            elif is_braille(ch):
-                style = _LAND_STYLE
-            else:
-                style = ""
-            txt.append(ch, style=style)
-        txt.append("\n")
-    return txt
 
 
 class ConfigScreen(Screen):
@@ -176,16 +149,22 @@ class SentinelDashboardApp(App):
         ("m", "mesh", "Mesh"),
     ]
 
-    def __init__(self, settings_path: str, refresh_interval: float = 5.0) -> None:
+    def __init__(self, settings_path: str, refresh_interval: float = 3.0) -> None:
         super().__init__()
         self.settings_path = settings_path
         self.refresh_interval = refresh_interval
+        self._frame = 0
+        self._stage = ""
+        self._lang = "en"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield Static(id="map", classes="panel")
         with Horizontal():
             yield Static(id="activity", classes="panel wide")
+            yield Static(id="blockstats", classes="panel wide")
+        yield Static(id="pipeline", classes="panel")
+        with Horizontal():
+            yield Static(id="sandbox", classes="panel wide")
             yield Static(id="attack", classes="panel wide")
         with Horizontal():
             yield Static(id="status", classes="panel")
@@ -201,6 +180,17 @@ class SentinelDashboardApp(App):
     def on_mount(self) -> None:
         self.action_refresh()
         self.set_interval(self.refresh_interval, self.action_refresh)
+        self.set_interval(0.2, self._animate)  # anime-style pipeline flow
+
+    def _animate(self) -> None:
+        self._frame += 1
+        try:
+            self.query_one("#pipeline", Static).update(
+                f"[b cyan]{t('panel.pipeline', self._lang)}[/]\n[#ffd500]"
+                + "\n".join(pipeline_lines(self._stage, self._frame, self._lang)) + "[/]"
+            )
+        except Exception:  # noqa: BLE001 - widget not mounted yet
+            pass
 
     def action_config(self) -> None:
         self.push_screen(ConfigScreen(self.settings_path))
@@ -217,8 +207,9 @@ class SentinelDashboardApp(App):
         settings = Settings.load(self.settings_path)
         state = DashboardModel(settings).build()
         lang = state.language
+        self._lang = lang
+        self._stage = state.pipeline_stage
         self.title = t("app.title", lang)
-        self.query_one("#map", Static).update(_map_text(state))
         u = state.usage
         tests = state.tests or {}
         none_yet = t("lbl.none_yet", lang)
@@ -268,4 +259,19 @@ class SentinelDashboardApp(App):
         # live log
         self.query_one("#logs", Static).update(
             f"[b cyan]{t('panel.logs', lang)}[/]\n" + ("\n".join(state.recent_logs[-8:]) or none_yet)
+        )
+        # security block stats (today / month / unique IPs)
+        self.query_one("#blockstats", Static).update(
+            f"[b cyan]{t('panel.blockstats', lang)}[/]\n"
+            f"[b #ff3355]{t('lbl.today', lang)}: {state.blocks_today}[/]   "
+            f"{t('lbl.month', lang)}: {state.blocks_month}   IP: {len(state.blocked_ips)}"
+        )
+        # docker sandbox (attack validation)
+        sb = state.sandbox_recent[-6:]
+        sb_text = "\n".join(
+            f"{v.get('name','?')} @ {v.get('replica','?')} "
+            f"[{t('sandbox.planned', lang) if v.get('planned') else t('sandbox.breach', lang) if v.get('breached') else t('sandbox.clean', lang)}]"
+            for v in sb) or t("sandbox.idle", lang)
+        self.query_one("#sandbox", Static).update(
+            f"[b cyan]{t('panel.sandbox', lang)}[/]\n{sb_text}"
         )

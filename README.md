@@ -10,8 +10,26 @@ authorization gate that **fails closed**.
 
 > ⚠️ **This tool is for assets you own or are explicitly authorized to test.**
 > It will refuse any target outside your signed ownership scope. It never attacks
-> third parties and never "hacks back". See [TERMS_OF_USE.md](TERMS_OF_USE.md) and
+> third parties and never "hacks back". See [TERMS_OF_USE.md](TERMS_OF_USE.md),
+> [DISCLAIMER.md](DISCLAIMER.md), [docs/SAFE_USE.md](docs/SAFE_USE.md), and
 > [docs/legal.md](docs/legal.md).
+
+**Language:** English is the default; Japanese (日本語) is selectable at first run
+(`sentinel init` asks; or set `ui.language: ja`). The CLI, dashboard, and settings
+screen are fully localized.
+
+**日本語:** 既定は英語です。初回 `sentinel init` で言語を選べ、`ui.language: ja` でも
+切替できます。CLI・ダッシュボード・設定画面は日本語に完全対応しています。
+自分が所有するサーバーの脆弱性を攻撃者より先に見つけて塞ぎ、複数の自分のサーバーを
+ローリング鍵通信とパッチのブロックチェーンで連携・強化します。詳しくは
+[docs/WHITEPAPER.md](docs/WHITEPAPER.md)（図付き解説・論文）を参照。
+
+## Documentation / ドキュメント
+- 📄 **[docs/WHITEPAPER.md](docs/WHITEPAPER.md)** — philosophy, architecture, patch
+  pipeline, the own-server mesh (rolling-key + blockchain), and threat model, with
+  diagrams. / 思想・構成・工程・メッシュ・脅威モデルの図付き解説。
+- [docs/architecture.md](docs/architecture.md) · [docs/threat-model.md](docs/threat-model.md) · [docs/legal.md](docs/legal.md)
+- [docs/SAFE_USE.md](docs/SAFE_USE.md) · [DISCLAIMER.md](DISCLAIMER.md) · [TERMS_OF_USE.md](TERMS_OF_USE.md) · [SECURITY.md](SECURITY.md)
 
 ## Safety model (why this is safe to run and to publish)
 

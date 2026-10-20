@@ -108,7 +108,10 @@ class UsageConfig(BaseModel):
     frequency can still be capped.
     """
 
-    provider: str = "api"  # "api" (metered) | "cli" (subscription)
+    provider: str = "api"  # "api" (metered) | "cli" (subscription) | "local" (local AI)
+    #: Local AI (OpenAI-compatible / Ollama) endpoint + model, used when provider=="local".
+    local_endpoint: str = "http://localhost:11434/v1/chat/completions"
+    local_model: str = "llama3.1"
     daily_token_budget: int = Field(default=1_000_000, ge=0)
     #: Model tiers from most to least capable; the governor steps down these.
     model_tiers: list[str] = Field(
@@ -120,6 +123,31 @@ class UsageConfig(BaseModel):
     stop_at: float = Field(default=1.0, ge=0.0, le=1.0)
     #: Baseline runs per hour when not throttled (frequency governor).
     base_runs_per_hour: int = Field(default=12, ge=1, le=3600)
+
+
+class MeshPeer(BaseModel):
+    name: str
+    ed25519_pub: str = ""   # hex
+    x25519_pub: str = ""    # hex
+    domain: str = ""        # the patch domain this peer owns (e.g. "nginx")
+    endpoint: str = ""      # transport address (reference; loopback used in-process)
+
+
+class MeshConfig(BaseModel):
+    """Distributed parallel-patch network among the operator's OWN servers only.
+
+    Nodes authenticate with a machine-bound encrypted key file (not an API key),
+    talk over a rolling-key channel, and share patches on a signed hash chain.
+    Using it on anything other than your own servers is a consent violation.
+    """
+
+    enabled: bool = False
+    node_name: str = ""
+    domain: str = ""                         # this node's patch specialization
+    key_file: str = "config/node.key.enc"    # encrypted node identity (machine-bound)
+    chain_file: str = "state/patchchain.jsonl"
+    time_window_seconds: int = Field(default=30, ge=1, le=3600)
+    peers: list[MeshPeer] = Field(default_factory=list)
 
 
 class Paths(BaseModel):
@@ -142,6 +170,7 @@ class Settings(BaseModel):
     intake: IntakeConfig = Field(default_factory=IntakeConfig)
     usage: UsageConfig = Field(default_factory=UsageConfig)
     geo: GeoConfig = Field(default_factory=GeoConfig)
+    mesh: MeshConfig = Field(default_factory=MeshConfig)
     paths: Paths = Field(default_factory=Paths)
 
     def save(self, path: str | Path) -> None:

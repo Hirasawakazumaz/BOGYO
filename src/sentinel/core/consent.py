@@ -52,6 +52,12 @@ REQUIRED_CLAUSES: dict[str, str] = {
         "202c). / 関連法令（不正アクセス禁止法、刑法168条の2・3／234条の2、CFAA、"
         "CMA、独202c 等）を順守します。"
     ),
+    "mesh_own_servers_only": (
+        "If I enable the distributed patch mesh, I will connect it ONLY to servers I "
+        "myself own and run this same software on; I will not peer with third-party or "
+        "others' machines. / 分散パッチメッシュを有効化する場合、本ソフトを導入した"
+        "自分自身が所有・運用するサーバーとだけ接続し、第三者や他者のマシンとは接続しません。"
+    ),
 }
 
 #: The operator must type this exact phrase to confirm.

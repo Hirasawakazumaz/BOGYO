@@ -150,12 +150,30 @@ class ConfigScreen(Screen):
             q("#msg", Label).update(f"error: {exc}")
 
 
+class HelpScreen(Screen):
+    def __init__(self, lang: str) -> None:
+        super().__init__()
+        self.lang = lang
+        self.BINDINGS = [("escape", "app.pop_screen", t("cfg.back", lang))]
+
+    def compose(self) -> ComposeResult:
+        L = self.lang
+        yield Header(show_clock=True)
+        with VerticalScroll(classes="panel"):
+            yield Label(t("panel.help", L), classes="title")
+            for k in ("help.flow", "help.safety", "help.q", "help.r", "help.c", "help.h", "help.m"):
+                yield Label(t(k, L))
+        yield Footer()
+
+
 class SentinelDashboardApp(App):
     CSS = CYBER_CSS
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
         ("c", "config", "Config"),
+        ("h", "help", "Help"),
+        ("m", "mesh", "Mesh"),
     ]
 
     def __init__(self, settings_path: str, refresh_interval: float = 5.0) -> None:
@@ -186,6 +204,14 @@ class SentinelDashboardApp(App):
 
     def action_config(self) -> None:
         self.push_screen(ConfigScreen(self.settings_path))
+
+    def action_help(self) -> None:
+        lang = Settings.load(self.settings_path).ui.language
+        self.push_screen(HelpScreen(lang))
+
+    def action_mesh(self) -> None:
+        from .mesh_screen import MeshScreen
+        self.push_screen(MeshScreen(self.settings_path))
 
     def action_refresh(self) -> None:
         settings = Settings.load(self.settings_path)

@@ -67,8 +67,8 @@ class Governor:
         tokens = self.ledger.tokens_today()
         budget = self.config.daily_token_budget
 
-        if self.config.provider == "cli" or budget <= 0:
-            # subscription / unmetered: never token-stop; frequency cap still applies
+        if self.config.provider in ("cli", "local") or budget <= 0:
+            # subscription / local AI / unmetered: never token-stop; frequency cap applies
             fraction = 0.0
             level = "normal"
             model = (self.config.model_tiers or ["claude-opus-4-8"])[0]

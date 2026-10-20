@@ -197,12 +197,117 @@ class AnthropicBackend:
             return self._fallback.refine(finding, candidate, conflicts)
 
 
-def default_backend(governor=None) -> PatchBackend:
-    """Pick the LLM backend if a key is present, else the deterministic rules.
+class LocalAIBackend:
+    """Local AI (OpenAI-compatible / Ollama) proposer. Offline-safe fallback to rules.
 
-    Pass a ``sentinel.usage.Governor`` to meter real token spend and let the daily
-    budget drive model selection and stop/resume.
+    Keeps everything on the operator's own machine — no cloud. Uses the chat
+    completions schema served by Ollama's /v1, LM Studio, llama.cpp, vLLM, etc.
     """
+
+    SYSTEM = AnthropicBackend.SYSTEM
+
+    def __init__(self, endpoint: str, model: str) -> None:
+        self.endpoint = endpoint
+        self.model = model
+        self._fallback = RuleBackend()
+
+    def _ask(self, finding: Finding, extra: str = "") -> list[PatchCandidate]:
+        import requests  # optional dependency
+
+        prompt = (
+            f"Service: {finding.service}\nFinding: {finding.title}\n{finding.detail}\n{extra}\n"
+            f"--- current {finding.path} ---\n{finding.original}\nReturn the hardened file content only."
+        )
+        resp = requests.post(
+            self.endpoint,
+            json={"model": self.model, "messages": [
+                {"role": "system", "content": self.SYSTEM},
+                {"role": "user", "content": prompt}], "stream": False},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        hardened = data["choices"][0]["message"]["content"].strip() + "\n"
+        if not hardened.strip() or hardened == finding.original:
+            return []
+        return [PatchCandidate(
+            finding_id=finding.id, service=finding.service, path=finding.path,
+            rationale=f"local-AI hardening ({self.model})", original=finding.original,
+            hardened=hardened, changes=["local-ai hardening"])]
+
+    def propose(self, finding: Finding) -> list[PatchCandidate]:
+        try:
+            return self._ask(finding) or self._fallback.propose(finding)
+        except Exception:  # noqa: BLE001
+            return self._fallback.propose(finding)
+
+    def refine(self, finding: Finding, candidate: PatchCandidate, conflicts: list[str]) -> list[PatchCandidate]:
+        extra = f"Previous candidate conflicted: {', '.join(conflicts)}. Be more conservative."
+        try:
+            return self._ask(finding, extra) or self._fallback.refine(finding, candidate, conflicts)
+        except Exception:  # noqa: BLE001
+            return self._fallback.refine(finding, candidate, conflicts)
+
+
+class ClaudeCliBackend:
+    """Use the logged-in Claude Code CLI (`claude -p`) — the subscription, no API key.
+
+    Simplifies setup: the operator just runs `claude` once to log in; this backend
+    shells out to it. Offline-safe: any failure falls back to the rule backend.
+    """
+
+    SYSTEM = AnthropicBackend.SYSTEM
+
+    def __init__(self, cli: str = "claude") -> None:
+        self.cli = cli
+        self._fallback = RuleBackend()
+
+    def _ask(self, finding: Finding, extra: str = "") -> list[PatchCandidate]:
+        import shutil
+        import subprocess
+
+        if shutil.which(self.cli) is None:
+            raise RuntimeError(f"{self.cli} CLI not found")
+        prompt = (
+            f"{self.SYSTEM}\n\nService: {finding.service}\nFinding: {finding.title}\n{finding.detail}\n{extra}\n"
+            f"--- current {finding.path} ---\n{finding.original}\nReturn ONLY the hardened file content."
+        )
+        proc = subprocess.run([self.cli, "-p", prompt], capture_output=True, text=True, timeout=180, check=False)
+        hardened = (proc.stdout or "").strip() + "\n"
+        if proc.returncode != 0 or not hardened.strip() or hardened == finding.original:
+            return []
+        return [PatchCandidate(
+            finding_id=finding.id, service=finding.service, path=finding.path,
+            rationale="Claude Code CLI hardening", original=finding.original,
+            hardened=hardened, changes=["claude-cli hardening"])]
+
+    def propose(self, finding: Finding) -> list[PatchCandidate]:
+        try:
+            return self._ask(finding) or self._fallback.propose(finding)
+        except Exception:  # noqa: BLE001
+            return self._fallback.propose(finding)
+
+    def refine(self, finding: Finding, candidate: PatchCandidate, conflicts: list[str]) -> list[PatchCandidate]:
+        extra = f"Previous candidate conflicted: {', '.join(conflicts)}. Be more conservative."
+        try:
+            return self._ask(finding, extra) or self._fallback.refine(finding, candidate, conflicts)
+        except Exception:  # noqa: BLE001
+            return self._fallback.refine(finding, candidate, conflicts)
+
+
+def default_backend(governor=None, settings=None) -> PatchBackend:
+    """Choose a backend from settings/provider, else env key, else offline rules.
+
+    provider "local" → local AI; "cli" → Claude Code CLI (subscription login);
+    otherwise the Anthropic API backend when a key is present (metered by the
+    governor); otherwise the deterministic offline rules.
+    """
+    usage = getattr(settings, "usage", None)
+    provider = getattr(usage, "provider", "api")
+    if provider == "local" and usage is not None:
+        return LocalAIBackend(usage.local_endpoint, usage.local_model)
+    if provider == "cli":
+        return ClaudeCliBackend()
     if os.environ.get("ANTHROPIC_API_KEY"):
         return AnthropicBackend(governor=governor)
     return RuleBackend()

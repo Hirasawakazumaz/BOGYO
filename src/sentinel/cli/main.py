@@ -283,7 +283,7 @@ def cmd_patch(args) -> int:
         original=original,
     )
     gov = Governor(settings.usage, UsageLedger(settings.paths.usage_file))
-    candidates = PatchProposer(guard, default_backend(governor=gov)).propose(finding)
+    candidates = PatchProposer(guard, default_backend(governor=gov, settings=settings)).propose(finding)
     if not candidates:
         _print(f"no hardening candidate for service {args.service!r} / {args.config}")
         return 0
@@ -367,6 +367,34 @@ def cmd_state(args) -> int:
         _print(_json.dumps(control.state_dict(settings), ensure_ascii=False, indent=2, default=str))
     else:
         _print(render_snapshot(DashboardModel(settings).build()))
+    return 0
+
+
+def cmd_mesh(args) -> int:
+    import getpass
+
+    from ..mesh import MeshNode, NodeIdentity, PatchChain
+
+    settings = _load_settings(args.settings)
+    mc = settings.mesh
+    if args.action == "keygen":
+        name = args.name or mc.node_name or "node"
+        pw = args.passphrase or getpass.getpass("node key passphrase: ")
+        idn = NodeIdentity.create(name)
+        idn.save(mc.key_file, pw)
+        _print(f"node '{name}' key saved (machine-bound): {mc.key_file}")
+        _print(f"  ed25519_pub: {idn.ed25519_pub_hex()}")
+        _print(f"  x25519_pub : {idn.x25519_pub_hex()}")
+        _print("share these PUBLIC keys with your other servers' mesh config (peers).")
+        return 0
+    if args.action == "status":
+        _print(f"mesh enabled: {mc.enabled}  node: {mc.node_name or '-'}  domain: {mc.domain or '-'}")
+        _print(f"peers configured: {len(mc.peers)}")
+        for p in mc.peers:
+            _print(f"  - {p.name}  domain={p.domain or '-'}  endpoint={p.endpoint or '-'}")
+        chain = PatchChain(mc.chain_file)
+        _print(f"patch chain height: {chain.height()}  pending: {len(chain.pending())}  applied: {len(chain.applied())}  valid: {chain.validate()}")
+        return 0
     return 0
 
 
@@ -479,6 +507,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp = with_settings(sub.add_parser("state", help="dashboard state (--json for machine-readable)"))
     sp.add_argument("--json", action="store_true", help="emit the full state as JSON")
     sp.set_defaults(func=cmd_state)
+
+    sp = with_settings(sub.add_parser("mesh", help="distributed patch mesh among YOUR OWN servers"))
+    msub = sp.add_subparsers(dest="action", required=True)
+    mk = msub.add_parser("keygen", help="create this node's machine-bound encrypted key")
+    mk.add_argument("--name", default="")
+    mk.add_argument("--passphrase", default="", help="non-interactive passphrase (else prompt)")
+    msub.add_parser("status", help="show node, peers, and patch-chain state")
+    sp.set_defaults(func=cmd_mesh)
 
     sp = with_settings(sub.add_parser("kill"))
     sp.add_argument("--reason", default="")

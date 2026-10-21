@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from typing import Optional, Protocol
 
 from .model import Finding, PatchCandidate
@@ -32,37 +33,129 @@ class PatchBackend(Protocol):
 # --------------------------------------------------------------------------- #
 # deterministic, offline rule backend
 # --------------------------------------------------------------------------- #
-#: service -> list of (regex, replacement, human rationale). Applied per line.
-_RULES: dict[str, list[tuple[str, str, str]]] = {
+@dataclass(frozen=True)
+class Rule:
+    """One hardening rule, in priority order within its service.
+
+    ``pattern`` matches an existing (possibly commented-out) setting and is
+    replaced by ``repl``. If ``ensure`` is set and ``present`` (default:
+    ``pattern``) matches nowhere, the ``ensure`` line is inserted instead, at a
+    service-specific spot (see :func:`_insert`). Rules only ever tighten.
+    """
+
+    pattern: str
+    repl: str
+    why: str
+    ensure: str = ""
+    present: str = ""
+
+
+def _sshd(key: str, value: str, why: str) -> Rule:
+    # active ``Key value`` / ``Key=value`` lines, or a commented default ``#Key value``
+    # (single token, so explanatory comment prose is left alone); keeps indentation.
+    pat = rf"(?im)^([ \t]*)(?:{key}(?:[ \t]*=[ \t]*|[ \t]+).*|#[ \t]*{key}[ \t]+\S+[ \t]*)$"
+    return Rule(pat, rf"\g<1>{key} {value}", why, ensure=f"{key} {value}")
+
+
+def _kv(key: str, value: str, why: str) -> Rule:
+    # ``key = value`` files (postgresql.conf, sysctl.conf), commented or not.
+    k = re.escape(key)
+    return Rule(rf"(?im)^([ \t]*)#?[ \t]*{k}[ \t]*=.*$", rf"\g<1>{key} = {value}", why,
+                ensure=f"{key} = {value}")
+
+
+#: service -> rules, highest priority first (``refine`` keeps only the first).
+_RULES: dict[str, list[Rule]] = {
     "sshd": [
-        (r"(?im)^\s*#?\s*PermitRootLogin\s+.*$", "PermitRootLogin no", "disable direct root SSH login"),
-        (r"(?im)^\s*#?\s*PasswordAuthentication\s+.*$", "PasswordAuthentication no", "require keys, not passwords"),
-        (r"(?im)^\s*#?\s*X11Forwarding\s+.*$", "X11Forwarding no", "disable X11 forwarding"),
+        _sshd("PermitRootLogin", "no", "disable direct root SSH login"),
+        _sshd("PasswordAuthentication", "no", "require keys, not passwords"),
+        _sshd("PermitEmptyPasswords", "no", "refuse empty passwords"),
+        _sshd("KbdInteractiveAuthentication", "no", "disable keyboard-interactive (password) auth"),
+        _sshd("ChallengeResponseAuthentication", "no", "disable challenge-response (password) auth"),
+        _sshd("HostbasedAuthentication", "no", "disable host-based trust"),
+        _sshd("IgnoreRhosts", "yes", "ignore legacy .rhosts files"),
+        _sshd("PermitUserEnvironment", "no", "stop users injecting environment into sshd"),
+        _sshd("X11Forwarding", "no", "disable X11 forwarding"),
+        _sshd("MaxAuthTries", "3", "limit authentication attempts per connection"),
+        _sshd("LoginGraceTime", "30", "shorten the unauthenticated login window"),
     ],
     "nginx": [
-        (r"(?im)^(\s*)server_tokens\s+on\s*;", r"\1server_tokens off;", "hide nginx version banner"),
+        Rule(r"(?im)^([ \t]*)server_tokens[ \t]+on[ \t]*;", r"\g<1>server_tokens off;",
+             "hide nginx version banner", ensure="server_tokens off;",
+             present=r"(?im)^[ \t]*server_tokens\b"),
+        # only rewrites lists that still allow SSLv2/3, TLSv1 or TLSv1.1 (never weakens)
+        Rule(r"(?im)^([ \t]*)ssl_protocols\b[^;]*\b(?:SSLv[23]|TLSv1(?:\.1)?)(?![.\d])[^;]*;",
+             r"\g<1>ssl_protocols TLSv1.2 TLSv1.3;", "drop SSLv3/TLSv1.0/TLSv1.1"),
+        Rule(r"(?im)^([ \t]*)autoindex[ \t]+on[ \t]*;", r"\g<1>autoindex off;",
+             "disable directory listings"),
     ],
     "postgres": [
-        (r"(?im)^\s*#?\s*ssl\s*=\s*.*$", "ssl = on", "require TLS for database connections"),
+        _kv("ssl", "on", "require TLS for database connections"),
+        Rule(r"(?im)^([ \t]*)#?[ \t]*password_encryption[ \t]*=[ \t]*'?(?:md5|on|off)\b'?.*$",
+             r"\g<1>password_encryption = scram-sha-256",
+             "hash new passwords with SCRAM, not MD5"),
+        _kv("log_connections", "on", "log connections for audit"),
+        _kv("log_disconnections", "on", "log disconnections for audit"),
+    ],
+    "sysctl": [
+        _kv("net.ipv4.tcp_syncookies", "1", "SYN-flood protection"),
+        _kv("net.ipv4.conf.all.accept_redirects", "0", "ignore ICMP redirects (IPv4)"),
+        _kv("net.ipv6.conf.all.accept_redirects", "0", "ignore ICMP redirects (IPv6)"),
+        _kv("net.ipv4.conf.all.send_redirects", "0", "do not send ICMP redirects"),
+        _kv("net.ipv4.conf.all.accept_source_route", "0", "refuse source-routed packets"),
+        _kv("net.ipv4.conf.all.rp_filter", "1", "reverse-path filtering against spoofing"),
+        _kv("net.ipv4.icmp_echo_ignore_broadcasts", "1", "ignore broadcast pings (smurf)"),
+        _kv("kernel.randomize_va_space", "2", "full ASLR"),
+        _kv("fs.protected_hardlinks", "1", "hardlink protection"),
+        _kv("fs.protected_symlinks", "1", "symlink protection"),
     ],
 }
+
+#: common alternative service names -> rule set
+_ALIASES = {"ssh": "sshd", "openssh": "sshd", "postgresql": "postgres", "pg": "postgres"}
+
+
+def rules_for(service: str) -> list[Rule]:
+    s = service.lower()
+    return _RULES.get(_ALIASES.get(s, s), [])
+
+
+def _insert(service: str, text: str, line: str) -> Optional[str]:
+    """Insert a missing directive where the service will honour it (None: no safe spot)."""
+    s = _ALIASES.get(service.lower(), service.lower())
+    if s == "nginx":
+        # inside the http {} context; a bare server/site snippet has no safe spot
+        m = re.search(r"(?m)^([ \t]*)http[ \t]*\{[^\n]*\n", text)
+        if m is None:
+            return None
+        return text[: m.end()] + f"{m.group(1)}    {line}\n" + text[m.end():]
+    if s == "sshd":
+        # directives after the first ``Match`` would only apply inside that block
+        m = re.search(r"(?im)^[ \t]*Match[ \t]", text)
+        if m is not None:
+            return text[: m.start()] + f"{line}\n" + text[m.start():]
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text + f"{line}\n"
 
 
 class RuleBackend:
     """Deterministic hardening. ``refine`` returns the single most important change."""
 
-    def _apply(self, text: str, rules: list[tuple[str, str, str]]) -> tuple[str, list[str]]:
+    def _apply(self, service: str, text: str, rules: list[Rule]) -> tuple[str, list[str]]:
         hardened = text
         applied: list[str] = []
-        for pattern, repl, why in rules:
-            new = re.sub(pattern, repl, hardened)
+        for rule in rules:
+            new = re.sub(rule.pattern, rule.repl, hardened)
+            if new == hardened and rule.ensure and not re.search(rule.present or rule.pattern, hardened):
+                new = _insert(service, hardened, rule.ensure) or hardened
             if new != hardened:
                 hardened = new
-                applied.append(why)
+                applied.append(rule.why)
         return hardened, applied
 
-    def _candidate(self, finding: Finding, rules: list[tuple[str, str, str]]) -> Optional[PatchCandidate]:
-        hardened, applied = self._apply(finding.original, rules)
+    def _candidate(self, finding: Finding, rules: list[Rule]) -> Optional[PatchCandidate]:
+        hardened, applied = self._apply(finding.service, finding.original, rules)
         if hardened == finding.original:
             return None
         return PatchCandidate(
@@ -76,16 +169,14 @@ class RuleBackend:
         )
 
     def propose(self, finding: Finding) -> list[PatchCandidate]:
-        rules = _RULES.get(finding.service.lower(), [])
-        cand = self._candidate(finding, rules)
+        cand = self._candidate(finding, rules_for(finding.service))
         return [cand] if cand else []
 
     def refine(
         self, finding: Finding, candidate: PatchCandidate, conflicts: list[str]
     ) -> list[PatchCandidate]:
         # Be more conservative: apply only the single highest-priority rule.
-        rules = _RULES.get(finding.service.lower(), [])
-        cand = self._candidate(finding, rules[:1])
+        cand = self._candidate(finding, rules_for(finding.service)[:1])
         if cand is None or cand.hardened == candidate.hardened:
             return []
         return [cand]

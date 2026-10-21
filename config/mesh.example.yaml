@@ -1,0 +1,18 @@
+# Example `mesh:` section for config/settings.yaml (one node of your own fleet).
+# Copy the mesh: block into your settings.yaml and fill in the peer public keys
+# (printed by `sentinel mesh keygen`) and endpoints. Connect ONLY your own servers.
+
+mesh:
+  enabled: true
+  node_name: serverA          # this node's name (unique within your fleet)
+  domain: sshd                # the patch domain THIS node specializes in
+  key_file: config/node.key.enc        # machine-bound, passphrase-encrypted (never commit)
+  chain_file: state/patchchain.jsonl
+  time_window_seconds: 30     # must match across peers (rolling-key time granularity)
+  peers:
+    - name: serverB
+      domain: nginx
+      endpoint: "http://10.8.0.2:8787"   # serverB's address (private net/WireGuard recommended)
+      ed25519_pub: "PASTE_serverB_ed25519_pub_hex"
+      x25519_pub:  "PASTE_serverB_x25519_pub_hex"
+    # add more of YOUR OWN servers here...

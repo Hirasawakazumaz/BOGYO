@@ -25,7 +25,7 @@ from .core.config import Settings
 from .core.errors import ConfigError
 
 #: Dotted-key prefixes an external app may change via `config set`.
-SETTABLE_PREFIXES = ("dry_run", "ui.", "toggles.", "limits.", "usage.", "geo.", "intake.")
+SETTABLE_PREFIXES = ("dry_run", "ui.", "toggles.", "limits.", "usage.", "geo.", "intake.", "mesh.")
 #: Never settable through the control API (signed / path-sensitive).
 FORBIDDEN_PREFIXES = ("paths.",)
 

@@ -94,3 +94,23 @@ def test_mesh_share_and_conflict_gated_apply():
     block2 = na.propose({"finding": "F2"})
     shared2 = nb.ingest("A", na.encode_for("B", block2))
     assert nb.consider_apply(shared2, lambda blk: False) is None  # conflict -> not applied
+
+
+def test_transport_push_over_http_loopback():
+    from sentinel.mesh import push, serve
+
+    a, b = NodeIdentity.create("A"), NodeIdentity.create("B")
+    na, nb = MeshNode(a, "sshd"), MeshNode(b, "nginx")
+    na.add_peer("B", b.ed25519_pub(), b.x25519_pub(), "nginx")
+    nb.add_peer("A", a.ed25519_pub(), a.x25519_pub(), "sshd")
+
+    srv = serve(nb, "127.0.0.1", 0, background=True)  # OS-assigned port
+    try:
+        port = srv.server_address[1]
+        block = na.propose({"service": "sshd", "finding": "F1", "path": "/etc/ssh/sshd_config"})
+        acks = push(na, "B", f"http://127.0.0.1:{port}", [block])
+    finally:
+        srv.shutdown()
+    assert acks and acks[0]["status"] in ("applied", "shared")
+    assert nb.chain.height() >= 1
+    assert nb.chain.validate()

@@ -57,8 +57,11 @@ class RatchetChannel:
     granularity mixed into the key; a ±1 window skew is tolerated.
     """
 
-    def __init__(self, root: bytes, window_seconds: int = 30) -> None:
-        self._k = _hkdf(root, b"init")
+    def __init__(self, root: bytes, window_seconds: int = 30, session_salt: bytes = b"") -> None:
+        # A per-session salt lets each transport exchange start from a fresh K0,
+        # so request/response sessions never desync across restarts while still
+        # rolling the key per message within the session.
+        self._k = _hkdf(root, b"init:" + session_salt)
         self._n = 0
         self.window = max(1, int(window_seconds))
 

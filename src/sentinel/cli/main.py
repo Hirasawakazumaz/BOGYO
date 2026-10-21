@@ -373,27 +373,66 @@ def cmd_state(args) -> int:
 def cmd_mesh(args) -> int:
     import getpass
 
-    from ..mesh import MeshNode, NodeIdentity, PatchChain
+    from ..mesh import NodeIdentity, PatchChain, node_from_settings, push as mesh_push, serve as mesh_serve
 
     settings = _load_settings(args.settings)
     mc = settings.mesh
+
+    def _pw() -> str:
+        return args.passphrase or getpass.getpass("node key passphrase: ")
+
     if args.action == "keygen":
         name = args.name or mc.node_name or "node"
-        pw = args.passphrase or getpass.getpass("node key passphrase: ")
         idn = NodeIdentity.create(name)
-        idn.save(mc.key_file, pw)
+        idn.save(mc.key_file, _pw())
         _print(f"node '{name}' key saved (machine-bound): {mc.key_file}")
         _print(f"  ed25519_pub: {idn.ed25519_pub_hex()}")
         _print(f"  x25519_pub : {idn.x25519_pub_hex()}")
         _print("share these PUBLIC keys with your other servers' mesh config (peers).")
         return 0
+
     if args.action == "status":
         _print(f"mesh enabled: {mc.enabled}  node: {mc.node_name or '-'}  domain: {mc.domain or '-'}")
         _print(f"peers configured: {len(mc.peers)}")
         for p in mc.peers:
             _print(f"  - {p.name}  domain={p.domain or '-'}  endpoint={p.endpoint or '-'}")
         chain = PatchChain(mc.chain_file)
-        _print(f"patch chain height: {chain.height()}  pending: {len(chain.pending())}  applied: {len(chain.applied())}  valid: {chain.validate()}")
+        _print(f"patch chain height: {chain.height()}  pending: {len(chain.pending())}  "
+               f"applied: {len(chain.applied())}  valid: {chain.validate()}")
+        return 0
+
+    if args.action == "propose":
+        node = node_from_settings(settings, _pw())
+        block = node.propose({"service": args.service or mc.domain or "generic",
+                              "finding": args.finding or "F-manual",
+                              "path": args.path or "", "note": args.note or ""})
+        _print(f"proposed block #{block.index} ({block.domain}) hash={block.hash[:16]}… status=shared")
+        return 0
+
+    if args.action == "serve":
+        node = node_from_settings(settings, _pw())
+        _print(f"mesh node '{node.identity.name}' (domain={node.domain}) serving on {args.host}:{args.port}")
+        _print(f"peers: {', '.join(p.name for p in mc.peers) or '(none)'}  — Ctrl-C to stop")
+        mesh_serve(node, args.host, args.port)  # blocking
+        return 0
+
+    if args.action == "push":
+        node = node_from_settings(settings, _pw())
+        peer = next((p for p in mc.peers if p.name == args.to), None)
+        if peer is None:
+            _print(f"ERROR: peer '{args.to}' not in mesh.peers")
+            return 1
+        endpoint = args.endpoint or peer.endpoint
+        if not endpoint:
+            _print(f"ERROR: no endpoint for peer '{args.to}' (set peers[].endpoint or --endpoint)")
+            return 1
+        blocks = node.chain.pending() if args.pending else node.chain.blocks[-1:]
+        if not blocks:
+            _print("nothing to push (chain empty); run `sentinel mesh propose` first")
+            return 0
+        acks = mesh_push(node, args.to, endpoint, blocks)
+        for a in acks:
+            _print(f"  peer ack: {a.get('status')}  ref={str(a.get('ref'))[:16]}")
         return 0
     return 0
 
@@ -514,6 +553,18 @@ def build_parser() -> argparse.ArgumentParser:
     mk.add_argument("--name", default="")
     mk.add_argument("--passphrase", default="", help="non-interactive passphrase (else prompt)")
     msub.add_parser("status", help="show node, peers, and patch-chain state")
+    mpr = msub.add_parser("propose", help="create a signed patch block on the local chain")
+    mpr.add_argument("--service", default=""); mpr.add_argument("--finding", default="")
+    mpr.add_argument("--path", default=""); mpr.add_argument("--note", default="")
+    mpr.add_argument("--passphrase", default="")
+    msv = msub.add_parser("serve", help="run this node's mesh endpoint (blocking)")
+    msv.add_argument("--host", default="127.0.0.1"); msv.add_argument("--port", type=int, default=8787)
+    msv.add_argument("--passphrase", default="")
+    mpu = msub.add_parser("push", help="send patch block(s) to a peer over the rolling-key channel")
+    mpu.add_argument("--to", required=True, help="peer name from mesh.peers")
+    mpu.add_argument("--endpoint", default="", help="override peer endpoint (http://host:port)")
+    mpu.add_argument("--pending", action="store_true", help="push all pending blocks (else the latest)")
+    mpu.add_argument("--passphrase", default="")
     sp.set_defaults(func=cmd_mesh)
 
     sp = with_settings(sub.add_parser("kill"))

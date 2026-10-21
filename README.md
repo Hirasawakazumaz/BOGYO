@@ -1,6 +1,6 @@
 # BOGYO
 
-[![CI](https://github.com/Hirasawakazumaz/sentinel-guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hirasawakazumaz/sentinel-guard/actions/workflows/ci.yml)
+[![CI](https://github.com/Hirasawakazumaz/BOGYO/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hirasawakazumaz/BOGYO/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-1f1f24?logo=python&logoColor=white)](pyproject.toml)
 [![License: MIT + use notice](https://img.shields.io/badge/license-MIT%20%2B%20use%20notice-1f1f24)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-115%20passing-bc002d)](tests/)
@@ -220,6 +220,5 @@ By using BOGYO you accept the [Terms of Use](TERMS_OF_USE.md) and the
 ## License
 
 [MIT](LICENSE) with an additional use notice (authorized, defensive use only).
-BOGYO was previously named *Sentinel-Guard*: the repository URL, the Python package
-(`sentinel`) and the CLI command (`sentinel`, alias `bogyo`) keep the old name for
-compatibility.
+BOGYO was previously named *Sentinel-Guard*: the Python package (`sentinel`) and the
+CLI command (`sentinel`, alias `bogyo`) keep the old name for compatibility.

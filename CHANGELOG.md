@@ -46,4 +46,4 @@ First public release.
   architecture, usage guide, paper draft, safe-use requests, disclaimer).
 - CI on Python 3.11–3.13, including a check that no secrets or local state are tracked.
 
-[0.1.0]: https://github.com/Hirasawakazumaz/sentinel-guard/releases/tag/v0.1.0
+[0.1.0]: https://github.com/Hirasawakazumaz/BOGYO/releases/tag/v0.1.0

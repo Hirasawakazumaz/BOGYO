@@ -1,0 +1,30 @@
+{
+  "env": {
+    "python": "3.13.16",
+    "machine": "x86_64",
+    "cpus": 4
+  },
+  "audit": {
+    "append_us_per_entry": 28.9,
+    "verify_ms_for_10k": 117.8,
+    "verify_ok": true
+  },
+  "tamper": {
+    "trials_each": 200,
+    "detected": {
+      "modify": 200,
+      "delete": 200,
+      "swap": 200
+    }
+  },
+  "full_rewrite": {
+    "local_verify_passes": true,
+    "detected_by_witnessed_head": true
+  },
+  "guard": {
+    "allow_median_us": 71.3,
+    "deny_out_of_scope_median_us": 43.7,
+    "deny_redteam_production_median_us": 109.0,
+    "audit_chain_intact_after": true
+  }
+}

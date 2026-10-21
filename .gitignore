@@ -32,3 +32,6 @@ audit*.log
 audit*.jsonl
 KILL
 .env
+
+# built publication HTML
+docs/publication/dist/

@@ -1,6 +1,6 @@
 # Disclaimer
 
-**Read this before using Sentinel-Guard.**
+**Read this before using SAKI-MORI.**
 
 1. **No warranty.** The software is provided "AS IS", without warranty of any kind,
    express or implied, including merchantability, fitness for a particular purpose,

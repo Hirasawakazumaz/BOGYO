@@ -1,4 +1,4 @@
-# Sentinel-Guard — Whitepaper
+# SAKI-MORI — Whitepaper
 
 *Proactive, consent-gated, distributed defense for servers you own.*
 
@@ -27,7 +27,7 @@ flowchart LR
     A[AI-accelerated attacks] -->|race| D{Who patches first?}
     D -->|attacker wins| X[Breach]
     D -->|we win| W[Proactive fix]
-    subgraph Sentinel-Guard
+    subgraph SM [SAKI-MORI]
       S1[Find your own<br/>vulns first] --> S2[Fix & harden]
       S2 --> S3[Share across<br/>your servers]
       S3 --> S1
@@ -135,7 +135,7 @@ flowchart TB
 sequenceDiagram
     participant A as Node A
     participant B as Node B
-    Note over A,B: root = X25519(A,B); K0 = HKDF(root)
+    Note over A,B: root = X25519(A,B), K0 = HKDF(root)
     A->>B: enc(K0, patch) + sig   (time window t)
     Note over A,B: K1 = HKDF(K0, H(ciphertext0) ‖ t)
     B->>A: enc(K1, verify-result) + sig

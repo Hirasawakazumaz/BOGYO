@@ -38,6 +38,10 @@ First public release.
   run reports, LangGraph orchestration (optional extra).
 
 ### Project
+- Project renamed **SAKI-MORI** (formerly Sentinel-Guard). The Python package and the
+  `sentinel` command keep their names; `sakimori` is added as an alias command.
+- Ink, off-white and crimson visual identity (README banner, social preview, TUI theme).
+- Fixed: the TUI crashed on its pipeline timer with current Textual releases.
 - English documentation: whitepaper, mesh setup, publication set (concept &
   architecture, usage guide, paper draft, safe-use requests, disclaimer).
 - CI on Python 3.11–3.13, including a check that no secrets or local state are tracked.

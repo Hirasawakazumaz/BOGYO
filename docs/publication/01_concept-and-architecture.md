@@ -1,4 +1,4 @@
-# Sentinel-Guard: Concept and Architecture, Illustrated
+# SAKI-MORI: Concept and Architecture, Illustrated
 
 **Preparing for AI-accelerated attacks with "get there first", "defense in depth" and "records that cannot be silently rewritten"**
 
@@ -21,7 +21,7 @@
 10. [Defensive blocking (no hack-back)](#10-defensive-blocking-no-hack-back-implemented)
 11. [AI usage governor](#11-ai-usage-governor-implemented)
 12. [Dashboard and control API](#12-dashboard-and-control-api-implemented)
-13. [Multi-PC cooperation and composite chain "Sentinel Mesh" (proposal)](#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-proposal)
+13. [Multi-PC cooperation and composite chain "SAKI-MORI Mesh" (proposal)](#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-proposal)
 14. [Defense in depth, summarized](#14-defense-in-depth-summarized)
 15. [Glossary](#15-glossary)
 
@@ -48,7 +48,7 @@ flowchart LR
         A3 --> A4["Damage<br/>noticed"]
         A4 --> A5["Investigate<br/>and fix"]
     end
-    subgraph NEW["Sentinel-Guard: proactive defense"]
+    subgraph NEW["SAKI-MORI: proactive defense"]
         direction LR
         B1["Vulnerability<br/>published"] --> B2["Continuous automated<br/>self-assessment of own assets"]
         B2 --> B3["Reproduce and verify<br/>in an isolated sandbox"]
@@ -62,7 +62,7 @@ flowchart LR
 
 The key tension is this: **defenders must automate or they lose on speed**, yet **automated tools can themselves become dangerous**.
 Scanning and attack-validation tools turn into attacks on someone else's systems if pointed at the wrong target.
-Sentinel-Guard is built to satisfy both requirements at once: move fast, and never point at the wrong target.
+SAKI-MORI is built to satisfy both requirements at once: move fast, and never point at the wrong target.
 
 ---
 
@@ -70,7 +70,7 @@ Sentinel-Guard is built to satisfy both requirements at once: move fast, and nev
 
 ```mermaid
 mindmap
-  root(("Sentinel-Guard<br/>defense philosophy"))
+  root(("SAKI-MORI<br/>defense philosophy"))
     Pillar 1: Get there first
       Find your own weaknesses<br/>before attackers do
       Continuous self-assessment
@@ -98,7 +98,7 @@ mindmap
 
 **Find the vulnerabilities in your own servers before attackers do, and defend them.** This is the core idea.
 
-If attackers use AI to probe, defenders should probe themselves just as often — but **only their own assets**. Sentinel-Guard runs this loop:
+If attackers use AI to probe, defenders should probe themselves just as often — but **only their own assets**. SAKI-MORI runs this loop:
 
 ```mermaid
 flowchart TB
@@ -132,7 +132,7 @@ See [Section 13](#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-prop
 ### Pillar 3: Tamper-evident records (a composite of blockchain techniques) [Partly implemented]
 
 One of the first things an intruder does is **erase their tracks** (delete or alter logs).
-Sentinel-Guard protects its records by **combining the building blocks of blockchains to fit the purpose**:
+SAKI-MORI protects its records by **combining the building blocks of blockchains to fit the purpose**:
 
 | Technique | Role | Status |
 |-----------|------|--------|
@@ -153,7 +153,7 @@ Sentinel-Guard protects its records by **combining the building blocks of blockc
 ## 3. Design principles: fail closed
 
 An automated defense tool must **fall to the "do nothing" side when configuration is broken or information is missing**.
-This is called **fail-closed**. Sentinel-Guard follows seven principles:
+This is called **fail-closed**. SAKI-MORI follows seven principles:
 
 | # | Principle | Mechanism | Status |
 |---|-----------|-----------|--------|
@@ -552,14 +552,14 @@ The dashboard only **reads** the audit log, so nothing on it can trigger an atta
 
 ---
 
-## 13. Multi-PC cooperation and composite chain "Sentinel Mesh" (proposal)
+## 13. Multi-PC cooperation and composite chain "SAKI-MORI Mesh" (proposal)
 
 > ⚠️ **This section is a design proposal. It is not in the current code.**
 > Any implementation must respect every safety constraint listed here.
 
 ### 13.1 Goals
 
-| Problem | Single-node limitation | Sentinel Mesh answer |
+| Problem | Single-node limitation | SAKI-MORI Mesh answer |
 |---------|------------------------|----------------------|
 | Record tampering | With root, an attacker can rebuild the whole log | Other nodes hold signed head hashes, so a rebuild is exposed |
 | Slow detection | Each server learns about attackers on its own | An attacker detected by one node is shared, signed, with all nodes |
@@ -587,7 +587,7 @@ flowchart TB
     L -.->|"daily: head hash only"| EXT
 ```
 
-*Figure 12: Proposed Sentinel Mesh topology. Only your own assets listed in the signed scope may join. Only hash values leave the mesh — never log contents.*
+*Figure 12: Proposed SAKI-MORI Mesh topology. Only your own assets listed in the signed scope may join. Only hash values leave the mesh — never log contents.*
 
 **Membership requirements**
 
@@ -669,7 +669,7 @@ sequenceDiagram
 
 ### 13.5 Why permissioned?
 
-| Approach | Consensus | Fit for Sentinel Mesh |
+| Approach | Consensus | Fit for SAKI-MORI Mesh |
 |----------|-----------|-----------------------|
 | Public (e.g. Bitcoin) | Proof of Work | ✕ All participants are you; costly in power and latency |
 | Public (PoS family) | Proof of Stake | ✕ No need for economic incentives |

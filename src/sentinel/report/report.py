@@ -41,7 +41,7 @@ class RunReport:
     def to_markdown(self) -> str:
         integ = "intact ✅" if self.chain_intact else "TAMPERED ❌"
         lines = [
-            "# Sentinel-Guard run report",
+            "# SAKI-MORI run report",
             "",
             f"- audit log: `{self.audit_file}`",
             f"- chain integrity: **{integ}**",

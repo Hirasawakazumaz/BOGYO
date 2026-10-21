@@ -39,7 +39,7 @@ def test_report_writes_files(make_env, tmp_path):
     md, js = tmp_path / "r.md", tmp_path / "r.json"
     ReportBuilder(guard.settings.paths.audit_file).write(md, js)
     assert md.exists() and js.exists()
-    assert "Sentinel-Guard run report" in md.read_text(encoding="utf-8")
+    assert "SAKI-MORI run report" in md.read_text(encoding="utf-8")
 
 
 def test_report_detects_tampered_chain(make_env, tmp_path):

@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sentinel-guard"
+name = "saki-mori"
 version = "0.1.0"
 description = "Authorized, consent-gated proactive defense & self-pentest orchestration for Linux servers (own assets only)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-authors = [{ name = "Sentinel-Guard contributors" }]
+authors = [{ name = "SAKI-MORI contributors" }]
 keywords = ["security", "defense", "fail2ban", "nftables", "authorized-pentest", "langgraph"]
 dependencies = [
     "pydantic>=2.6",
@@ -37,6 +37,7 @@ dev = [
 
 [project.scripts]
 sentinel = "sentinel.cli.main:main"
+sakimori = "sentinel.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

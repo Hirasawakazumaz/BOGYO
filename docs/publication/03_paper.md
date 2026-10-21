@@ -1,13 +1,13 @@
 # Consent-Gated Proactive Self-Defense and a Layered Tamper-Evident Ledger against AI-Accelerated Attacks
 
-## Design, Implementation and Evaluation of Sentinel-Guard, with a Proposal for Multi-Node "Sentinel Mesh"
+## Design, Implementation and Evaluation of SAKI-MORI, with a Proposal for Multi-Node "SAKI-MORI Mesh"
 
-Author: Sentinel-Guard contributors / Version: preprint draft v0.1 (2026-10-18) / Implementation: sentinel-guard 0.1.0 (2026-10-18 snapshot)
+Author: SAKI-MORI contributors / Version: preprint draft v0.1 (2026-10-18) / Implementation: saki-mori 0.1.0 (2026-10-18 snapshot)
 
-> **Snapshot note:** these documents describe the Sentinel-Guard 0.1.0 code as of 2026-10-18. Since then the multi-node mesh has been **implemented** (rolling-key channel, signed patch chain, and a sandbox conflict gate before apply) — see [../WHITEPAPER.md](../WHITEPAPER.md) §4 and [../MESH_SETUP.md](../MESH_SETUP.md). Statements below that call the mesh a proposal or "not implemented" are out of date.
+> **Snapshot note:** these documents describe the SAKI-MORI 0.1.0 code as of 2026-10-18. Since then the multi-node mesh has been **implemented** (rolling-key channel, signed patch chain, and a sandbox conflict gate before apply) — see [../WHITEPAPER.md](../WHITEPAPER.md) §4 and [../MESH_SETUP.md](../MESH_SETUP.md). Statements below that call the mesh a proposal or "not implemented" are out of date.
 
 > **Scope of the claims in this paper:** the capabilities and measurements in Sections 5 and 8 are implemented in the repository to be published and can be checked against its tests.
-> The multi-node "Sentinel Mesh" in Section 6 is a **proposal (not implemented)**; its security is argued at the design level only.
+> The multi-node "SAKI-MORI Mesh" in Section 6 is a **proposal (not implemented)**; its security is argued at the design level only.
 
 ---
 
@@ -15,9 +15,9 @@ Author: Sentinel-Guard contributors / Version: preprint draft v0.1 (2026-10-18) 
 
 Generative AI is automating and accelerating offensive work such as turning advisories into exploits, large-scale reconnaissance and generating malware variants, shrinking the window between a vulnerability's disclosure and its exploitation. Defense built around manual periodic checks and after-the-fact response cannot keep up with this difference in speed. Yet when defenders automate assessment and attack validation, a dual-use problem appears: misdirected, the tool itself becomes a means of attacking third parties.
 
-We propose Sentinel-Guard, a design that satisfies both requirements at once: the speed to find and close one's own weaknesses before attackers do, and the safety never to act on anything other than one's own assets. At its center is ScopeGuard, a single authorization gate through which every active operation passes. It combines an Ed25519-signed scope of owned assets, an operator's signed consent bound to that scope's hash, default-deny toggles, an unconditional refusal of attack validation against production, human approval for applying changes, a kill-switch and a hash-chained audit log, and always falls to the deny side when anything is wrong (fail-closed). Attack validation runs only inside disposable Docker sandboxes whose isolation is enforced by structural YAML analysis, and fix proposals are shown to a human only after a conflict-evaluation loop in the sandbox.
+We propose SAKI-MORI, a design that satisfies both requirements at once: the speed to find and close one's own weaknesses before attackers do, and the safety never to act on anything other than one's own assets. At its center is ScopeGuard, a single authorization gate through which every active operation passes. It combines an Ed25519-signed scope of owned assets, an operator's signed consent bound to that scope's hash, default-deny toggles, an unconditional refusal of attack validation against production, human approval for applying changes, a kill-switch and a hash-chained audit log, and always falls to the deny side when anything is wrong (fail-closed). Attack validation runs only inside disposable Docker sandboxes whose isolation is enforced by structural YAML analysis, and fix proposals are shown to a human only after a conflict-evaluation loop in the sandbox.
 
-The implementation consists of about 4,200 lines of Python and 85 tests, with a test mapped to every safety property. Guard decisions take a median of 44–109 µs and audit appends about 29 µs per entry, so they never become the bottleneck of the automated defense loop. The single-node audit chain detected all 200 trials each of modification, deletion and reordering of records. We also confirm experimentally that a full rewrite by an attacker who has obtained write access cannot be detected on a single node, and show that an externally held head hash does detect it. To remove this limitation we propose "Sentinel Mesh", a permissioned composite ledger in which several PCs owned by the operator mutually attest the heads of their audit chains with Merkle trees and k-of-n signatures, optionally anchored to external timestamps, and discuss its safety conditions.
+The implementation consists of about 4,200 lines of Python and 85 tests, with a test mapped to every safety property. Guard decisions take a median of 44–109 µs and audit appends about 29 µs per entry, so they never become the bottleneck of the automated defense loop. The single-node audit chain detected all 200 trials each of modification, deletion and reordering of records. We also confirm experimentally that a full rewrite by an attacker who has obtained write access cannot be detected on a single node, and show that an externally held head hash does detect it. To remove this limitation we propose "SAKI-MORI Mesh", a permissioned composite ledger in which several PCs owned by the operator mutually attest the heads of their audit chains with Merkle trees and k-of-n signatures, optionally anchored to external timestamps, and discuss its safety conditions.
 
 **Keywords**: proactive defense, self-assessment, fail-closed, dual-use, consent gate, tamper-evident logging, hash chain, Merkle tree, permissioned blockchain, Byzantine fault tolerance, AI-assisted attacks
 
@@ -44,9 +44,9 @@ All three sit on a foundation of safety: never act on anything other than your o
 ### 1.3 Contributions
 
 - **C1** We formulate design principles that reconcile automated proactive defense with the containment of dual-use risk (fail-closed, single gate, default deny, production inviolability, human approval, no retaliation, complete recording, immediate stop) (Section 4).
-- **C2** We build Sentinel-Guard implementing these principles and map each safety property to tests (Sections 5 and 8).
+- **C2** We build SAKI-MORI implementing these principles and map each safety property to tests (Sections 5 and 8).
 - **C3** We show experimentally both the detection capability and the limitation of a single-node hash-chained audit log (Section 8).
-- **C4** We propose Sentinel Mesh, a permissioned composite ledger among owned nodes that addresses this limitation, and discuss its safety conditions under node compromise (Sections 6 and 7).
+- **C4** We propose SAKI-MORI Mesh, a permissioned composite ledger among owned nodes that addresses this limitation, and discuss its safety conditions under node compromise (Sections 6 and 7).
 
 ---
 
@@ -58,19 +58,19 @@ Automated vulnerability discovery and repair with AI is advancing on the defensi
 
 ### 2.2 Practical guidance for security assessment
 
-NIST SP 800-115 [13] gives guidance for planning, conducting and reporting technical security tests and calls for a clear scope and authorization. NIST CSF 2.0 [14] adds "Govern" to Identify, Protect, Detect, Respond and Recover. Sentinel-Guard can be seen as an attempt to implement this guidance mechanically, by **enforcing scope and authorization cryptographically** and by making the governance record tamper-evident.
+NIST SP 800-115 [13] gives guidance for planning, conducting and reporting technical security tests and calls for a clear scope and authorization. NIST CSF 2.0 [14] adds "Govern" to Identify, Protect, Detect, Respond and Recover. SAKI-MORI can be seen as an attempt to implement this guidance mechanically, by **enforcing scope and authorization cryptographically** and by making the governance record tamper-evident.
 
 ### 2.3 Intrusion prevention and automatic blocking
 
-Detecting attackers from logs and blocking them at the firewall, as typified by fail2ban [18], is widely practiced. Sentinel-Guard's blocking follows this lineage but places blocking under the authorization gate and audit log, makes blocks time-limited (TTL) and excludes retaliation against the attacker by design.
+Detecting attackers from logs and blocking them at the firewall, as typified by fail2ban [18], is widely practiced. SAKI-MORI's blocking follows this lineage but places blocking under the authorization gate and audit log, makes blocks time-limited (TTL) and excludes retaliation against the attacker by design.
 
 ### 2.4 Tamper-evident logs and timestamps
 
-Haber and Stornetta [1] showed how to make timestamps hard to forge by chaining document hashes. Schneier and Kelsey [4] proposed secure audit logs that protect past entries even on a compromised machine, and Ma and Tsudik [25] used forward-secure aggregate signatures. Crosby and Wallach [5] built efficient tamper-evident logs from Merkle-tree-based history trees. Certificate Transparency [11] operates append-only Merkle-tree logs at scale, verified by multiple monitors. RFC 3161 [10] defines time attestation by a third-party timestamp authority. Sentinel-Guard's first layer (the hash chain) is the simplest form of [1][4]; layers 2–4 of the proposed Sentinel Mesh apply the ideas of [5][10][11] to mutual attestation among owned nodes.
+Haber and Stornetta [1] showed how to make timestamps hard to forge by chaining document hashes. Schneier and Kelsey [4] proposed secure audit logs that protect past entries even on a compromised machine, and Ma and Tsudik [25] used forward-secure aggregate signatures. Crosby and Wallach [5] built efficient tamper-evident logs from Merkle-tree-based history trees. Certificate Transparency [11] operates append-only Merkle-tree logs at scale, verified by multiple monitors. RFC 3161 [10] defines time attestation by a third-party timestamp authority. SAKI-MORI's first layer (the hash chain) is the simplest form of [1][4]; layers 2–4 of the proposed SAKI-MORI Mesh apply the ideas of [5][10][11] to mutual attestation among owned nodes.
 
 ### 2.5 Blockchains and distributed agreement
 
-Bitcoin [3] realized a ledger among unidentified participants using hash-chained blocks and Proof of Work consensus. Where participants are known, permissioned agreement such as PBFT [7], addressing the Byzantine Generals Problem [6], and permissioned blockchains such as Hyperledger Fabric [24] are used. Since Sentinel Mesh participants are limited to the operator's own nodes, Proof of Work is unnecessary and permissioned k-of-n signature agreement is appropriate.
+Bitcoin [3] realized a ledger among unidentified participants using hash-chained blocks and Proof of Work consensus. Where participants are known, permissioned agreement such as PBFT [7], addressing the Byzantine Generals Problem [6], and permissioned blockchains such as Hyperledger Fabric [24] are used. Since SAKI-MORI Mesh participants are limited to the operator's own nodes, Proof of Work is unnecessary and permissioned k-of-n signature agreement is appropriate.
 
 ### 2.6 Classic safety-design principles
 
@@ -140,7 +140,7 @@ flowchart TB
     GOV["usage<br/>AI usage governor"] --> PAT
 ```
 
-*Figure 1: Structure of Sentinel-Guard. Each capability acts only through the guard and writes its result to the audit log. Reports and the dashboard are pure readers of the audit log.*
+*Figure 1: Structure of SAKI-MORI. Each capability acts only through the guard and writes its result to the audit log. Reports and the dashboard are pure readers of the audit log.*
 
 The implementation targets Python 3.11+, with only three required dependencies: `pydantic`, `pyyaml` and `cryptography`. LangGraph and the Anthropic SDK (`[agent]`) and Textual (`[tui]`) are loaded lazily, so the core and its tests run offline.
 
@@ -201,7 +201,7 @@ Sources whose authentication failures exceed a threshold are extracted from fail
 
 ---
 
-## 6. Proposal: multi-node cooperation and the composite ledger "Sentinel Mesh" (not implemented)
+## 6. Proposal: multi-node cooperation and the composite ledger "SAKI-MORI Mesh" (not implemented)
 
 ### 6.1 Motivation
 
@@ -225,7 +225,7 @@ flowchart LR
     LED -.->|"daily: ledger head hash only"| TSA["External timestamp<br/>(optional)"]
 ```
 
-*Figure 2: Structure of Sentinel Mesh. Only hash values leave the mesh; log contents never do.*
+*Figure 2: Structure of SAKI-MORI Mesh. Only hash values leave the mesh; log contents never do.*
 
 ### 6.3 Four-layer structure of the composite ledger
 
@@ -280,7 +280,7 @@ When node v detects attacker x, it authorizes BLOCK with its own guard and block
 
 - **T2/T3 (misdirection, expansion of authority)**: S1 and S5 prevent action outside the scope and silent expansion of the scope. Expanding the scope itself requires the operator's private key and re-consent.
 - **T4 (production accidents)**: S2, S3, S4 and dry-run make attack validation against production impossible and limit application to human-approved changes.
-- **T5 (erasing tracks)**: S7 detects partial tampering. A full rebuild cannot be detected on a single node and is covered by layers 3 and 4 of Sentinel Mesh (Section 6).
+- **T5 (erasing tracks)**: S7 detects partial tampering. A full rebuild cannot be detected on a single node and is covered by layers 3 and 4 of SAKI-MORI Mesh (Section 6).
 - **T6 (derivatives with safeguards removed)**: this cannot be prevented technically. Concentrating the guard in a single path with no disable flag means removal requires explicit source modification; the Terms of Use prohibit it, and mapping safety properties to tests makes a weakening change fail the test suite.
 - **T7 (runaway automation)**: contained by limits, time windows, the AI usage governor and the kill-switch.
 - **T8 (node compromise, proposal)**: the quorum condition of §6.4 and constraints M1–M7 of §6.6 prevent finalization of false records and lock-out through false blocks.
@@ -339,7 +339,7 @@ All are in the microsecond to hundred-millisecond range, negligible compared wit
 
 ### 8.5 Limitations of the evaluation
 
-The evaluation is limited to unit tests and micro-benchmarks; long-term operation in production, detection rates against real attacks, fix quality and operator usability were not evaluated. Sentinel Mesh is not implemented, and the discussion in Section 6 is at the design level.
+The evaluation is limited to unit tests and micro-benchmarks; long-term operation in production, detection rates against real attacks, fix quality and operator usability were not evaluated. SAKI-MORI Mesh is not implemented, and the discussion in Section 6 is at the design level.
 
 ---
 
@@ -375,7 +375,7 @@ The system assumes use only on assets owned by the operator or for which written
 
 ## 11. Future work
 
-1. Implementing Sentinel Mesh (node certificates, mTLS, Merkle batching, k-of-n signatures, block sharing, external anchoring) and evaluating it under node compromise.
+1. Implementing SAKI-MORI Mesh (node certificates, mTLS, Merkle batching, k-of-n signatures, block sharing, external anchoring) and evaluating it under node compromise.
 2. Forward-secure key evolution [4][25] to protect records written before a compromise.
 3. Automatic backup and rollback when applying fixes.
 4. A safe application path for remote hosts.
@@ -386,7 +386,7 @@ The system assumes use only on assets owned by the operator or for which written
 
 ## 12. Conclusion
 
-In an era when AI accelerates attacks, defenders too must inspect their own assets frequently and automatically and close weaknesses before attackers find them. Automated inspection tools are dual-use, however, and become instruments of harm when misused. We designed and implemented Sentinel-Guard, which concentrates a signed scope, bound consent, default deny, production inviolability, human approval, complete recording and immediate stop in a single authorization gate; showed experimentally that the gate does not slow automation; and demonstrated both the detection capability and the limitation of a single-node audit chain. We further proposed Sentinel Mesh, a permissioned composite ledger among owned nodes that addresses this limitation. **Speed and safety can be reconciled by design** — that is the claim of this work.
+In an era when AI accelerates attacks, defenders too must inspect their own assets frequently and automatically and close weaknesses before attackers find them. Automated inspection tools are dual-use, however, and become instruments of harm when misused. We designed and implemented SAKI-MORI, which concentrates a signed scope, bound consent, default deny, production inviolability, human approval, complete recording and immediate stop in a single authorization gate; showed experimentally that the gate does not slow automation; and demonstrated both the detection capability and the limitation of a single-node audit chain. We further proposed SAKI-MORI Mesh, a permissioned composite ledger among owned nodes that addresses this limitation. **Speed and safety can be reconciled by design** — that is the claim of this work.
 
 ---
 

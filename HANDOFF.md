@@ -1,4 +1,4 @@
-# Sentinel-Guard — HANDOFF
+# SAKI-MORI — HANDOFF
 
 Living status doc for contributors. Update it at every milestone.
 
@@ -29,7 +29,10 @@ Never commit secrets or local state: keys, consent, `config/scope.yaml`,
 `config/settings.yaml`, `state/` are gitignored, and CI fails if any is tracked.
 
 ## Status
-All tests green (114). Recent milestones:
+The project is named **SAKI-MORI** (formerly Sentinel-Guard); the package `sentinel` and
+the `sentinel` command keep their names (alias `sakimori`).
+
+All tests green (115). Recent milestones:
 - CLI output goes through one English string table (`sentinel/i18n.py`). The UI is
   English-only; a legacy `ui.language` value is accepted and resolves to English.
 - **Mesh conflict gate** (`sentinel/mesh/gate.py`): a peer's patch is recorded `applied`

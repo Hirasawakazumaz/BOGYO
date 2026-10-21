@@ -1,6 +1,6 @@
 # Terms of Use
 
-By using Sentinel-Guard you agree to the following. These terms exist so the tool
+By using SAKI-MORI you agree to the following. These terms exist so the tool
 stays on the safe side of the law internationally.
 
 ## Authorized use only

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 
 class SentinelError(Exception):
-    """Base class for all Sentinel-Guard errors."""
+    """Base class for all SAKI-MORI errors."""
 
 
 class ConfigError(SentinelError):

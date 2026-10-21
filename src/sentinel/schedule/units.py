@@ -47,10 +47,10 @@ def _cron_expr(on_calendar: str) -> str:
 def generate(
     command: str,
     *,
-    name: str = "sentinel-guard",
+    name: str = "saki-mori",
     on_calendar: str = "daily",
     user: str = "root",
-    working_directory: str = "/opt/sentinel-guard",
+    working_directory: str = "/opt/saki-mori",
 ) -> ScheduleUnit:
     """Build systemd + cron artifacts for a periodic *defensive* run of ``command``.
 
@@ -70,7 +70,7 @@ def generate(
     service_text = "\n".join(
         [
             "[Unit]",
-            f"Description=Sentinel-Guard periodic defensive run ({command})",
+            f"Description=SAKI-MORI periodic defensive run ({command})",
             "After=network-online.target",
             "Wants=network-online.target",
             "",

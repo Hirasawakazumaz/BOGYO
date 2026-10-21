@@ -1,9 +1,9 @@
-# Sentinel-Guard Usage Guide
+# SAKI-MORI Usage Guide
 
 > **Read this first:** this tool may be used **only on assets you own or are explicitly authorized in writing to test**.
 > Before you start, read and agree to the [Requests for safe use](04_safe-use-requests.md) and the [Disclaimer](05_disclaimer.md).
 
-Applies to: sentinel-guard 0.1.0 / Platform: Linux, Python 3.11+
+Applies to: saki-mori 0.1.0 / Platform: Linux, Python 3.11+
 
 ---
 
@@ -31,8 +31,8 @@ flowchart TB
 ## 1. Install
 
 ```bash
-git clone <this repository> sentinel-guard
-cd sentinel-guard
+git clone <this repository> saki-mori
+cd saki-mori
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"            # core features and tests
 pip install -e ".[agent]"          # (optional) LangGraph and Claude-based fix proposals
@@ -296,8 +296,8 @@ The kill-switch is the file `state/KILL`. While it exists, both guard creation a
 
 ## 12. About multi-PC cooperation
 
-"Sentinel Mesh", which links several PCs together, is **a proposal and not implemented yet** ([Concept and Architecture, Section 13](01_concept-and-architecture.md#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-proposal)).
-To protect several machines today, **install Sentinel-Guard on each machine separately and sign, consent and operate on each one**.
+"SAKI-MORI Mesh", which links several PCs together, is **a proposal and not implemented yet** ([Concept and Architecture, Section 13](01_concept-and-architecture.md#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-proposal)).
+To protect several machines today, **install SAKI-MORI on each machine separately and sign, consent and operate on each one**.
 Collecting `sentinel report --json` from each machine gives you an overall picture.
 
 ---

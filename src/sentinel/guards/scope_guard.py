@@ -1,6 +1,6 @@
 """ScopeGuard — the one and only authorization gate.
 
-Every active capability in Sentinel-Guard must obtain a :class:`Decision` from
+Every active capability in SAKI-MORI must obtain a :class:`Decision` from
 ``ScopeGuard.authorize(...)`` before acting. The guard is constructed once via
 :meth:`ScopeGuard.from_settings`, which:
 

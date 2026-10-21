@@ -6,7 +6,7 @@ in the repository) rather than a public issue. Include reproduction steps and af
 versions. We aim to acknowledge within a few days.
 
 ## Scope of this project's safeguards
-SAKI-MORI is designed to **fail closed**. The following are treated as security
+BOGYO is designed to **fail closed**. The following are treated as security
 bugs and are covered by the test suite in `tests/`:
 - Authorizing an action against a target outside the signed scope.
 - Permitting red-team/exploit validation against production or outside a sandbox.

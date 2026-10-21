@@ -1,6 +1,6 @@
 # Requests for Safe Use
 
-SAKI-MORI is a tool for **protecting your own assets before attackers reach them**.
+BOGYO is a tool for **protecting your own assets before attackers reach them**.
 The same techniques become an attack on someone else if pointed at the wrong target. The author does not want this tool used for attacks.
 We ask everyone who uses, modifies, redistributes or studies it to follow the requests below.
 
@@ -51,7 +51,7 @@ We ask everyone who uses, modifies, redistributes or studies it to follow the re
 - **Do not create paths that bypass ScopeGuard.** Every new active capability must go through `ScopeGuard.authorize(...)`; if a new action class is needed, make it denied by default.
 - **Do not add flags, environment variables or hidden options that disable the guard.**
 - **Do not delete or disable safety tests.** A change that makes them fail may be weakening safety.
-- **When implementing proposed features (such as SAKI-MORI Mesh)**, respect every safety constraint in [Concept and Architecture 13.4](01_concept-and-architecture.md#134-sharing-block-decisions-signed-and-agreed) and [Paper 6.6](03_paper.md#66-safety-constraints-mandatory-for-any-implementation).
+- **When implementing proposed features (such as BOGYO Mesh)**, respect every safety constraint in [Concept and Architecture 13.4](01_concept-and-architecture.md#134-sharing-block-decisions-signed-and-agreed) and [Paper 6.6](03_paper.md#66-safety-constraints-mandatory-for-any-implementation).
   In particular, "only accept block proposals from other nodes", "each node's own guard decides" and "never block the allowlist" are mandatory.
 - **Do not add new exploit code, generic attack payloads or detection-evasion features.**
 - If you publish a modified version, **state clearly that it is modified and whether any safeguard was changed**.

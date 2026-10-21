@@ -1,9 +1,9 @@
-# SAKI-MORI Usage Guide
+# BOGYO Usage Guide
 
 > **Read this first:** this tool may be used **only on assets you own or are explicitly authorized in writing to test**.
 > Before you start, read and agree to the [Requests for safe use](04_safe-use-requests.md) and the [Disclaimer](05_disclaimer.md).
 
-Applies to: saki-mori 0.1.0 / Platform: Linux, Python 3.11+
+Applies to: bogyo 0.1.0 / Platform: Linux, Python 3.11+
 
 ---
 
@@ -31,8 +31,8 @@ flowchart TB
 ## 1. Install
 
 ```bash
-git clone <this repository> saki-mori
-cd saki-mori
+git clone <this repository> bogyo
+cd bogyo
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"            # core features and tests
 pip install -e ".[agent]"          # (optional) LangGraph and Claude-based fix proposals
@@ -296,8 +296,8 @@ The kill-switch is the file `state/KILL`. While it exists, both guard creation a
 
 ## 12. About multi-PC cooperation
 
-"SAKI-MORI Mesh", which links several PCs together, is **a proposal and not implemented yet** ([Concept and Architecture, Section 13](01_concept-and-architecture.md#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-proposal)).
-To protect several machines today, **install SAKI-MORI on each machine separately and sign, consent and operate on each one**.
+"BOGYO Mesh", which links several PCs together, is **a proposal and not implemented yet** ([Concept and Architecture, Section 13](01_concept-and-architecture.md#13-multi-pc-cooperation-and-composite-chain-sentinel-mesh-proposal)).
+To protect several machines today, **install BOGYO on each machine separately and sign, consent and operate on each one**.
 Collecting `sentinel report --json` from each machine gives you an overall picture.
 
 ---

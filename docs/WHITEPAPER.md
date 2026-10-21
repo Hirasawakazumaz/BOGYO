@@ -1,4 +1,4 @@
-# SAKI-MORI — Whitepaper
+# BOGYO — Whitepaper
 
 *Proactive, consent-gated, distributed defense for servers you own.*
 
@@ -27,7 +27,7 @@ flowchart LR
     A[AI-accelerated attacks] -->|race| D{Who patches first?}
     D -->|attacker wins| X[Breach]
     D -->|we win| W[Proactive fix]
-    subgraph SM [SAKI-MORI]
+    subgraph BG [BOGYO]
       S1[Find your own<br/>vulns first] --> S2[Fix & harden]
       S2 --> S3[Share across<br/>your servers]
       S3 --> S1

@@ -11,7 +11,7 @@ LANGUAGES = ("en",)
 
 _T: dict[str, dict[str, str]] = {
     "en": {
-        "app.title": "SAKI-MORI // GLOBAL DEFENSE GRID",
+        "app.title": "BOGYO // GLOBAL DEFENSE GRID",
         "panel.worldmap": "WORLD MAP",
         "panel.status": "DEFENSE STATUS",
         "panel.usage": "CLAUDE USAGE GOVERNOR",
@@ -108,7 +108,7 @@ _T: dict[str, dict[str, str]] = {
         "act.graph.done": "pipeline complete",
         "cli.init.done": "Created config/ and state/; consent keypair ready.",
         "cli.init.next": "Wrote {path}. Next: edit config/scope.yaml (own assets only), then: keygen → sign-scope → consent.",
-        "cli.init.welcome": "=== SAKI-MORI setup ===",
+        "cli.init.welcome": "=== BOGYO setup ===",
         "cli.keygen.done": "Generated scope signing keypair: config/scope.key (keep secret), config/scope.pub",
         "cli.signscope.done": "Signed {scope} → {scope}.sig  (scope_hash={h}…)",
         "cli.consent.title": "=== Operator consent / ownership attestation ===",
@@ -122,7 +122,7 @@ _T: dict[str, dict[str, str]] = {
         "cli.consent.type_phrase": "Type exactly: {phrase}",
         "cli.consent.saved": "Consent signed and saved to {path} (scope_hash={h}…).",
         "cli.consent.refused": "Consent refused: {reason}",
-        "cli.status.header": "saki-mori {ver}",
+        "cli.status.header": "bogyo {ver}",
         "cli.status.dry_run": "dry_run: {v}",
         "cli.status.toggles": "toggles: {v}",
         "cli.status.limits": "limits : {v}",

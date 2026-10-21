@@ -1,4 +1,4 @@
-# SAKI-MORI
+# BOGYO
 
 [![CI](https://github.com/Hirasawakazumaz/sentinel-guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hirasawakazumaz/sentinel-guard/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-1f1f24?logo=python&logoColor=white)](pyproject.toml)
@@ -6,31 +6,30 @@
 [![Tests](https://img.shields.io/badge/tests-115%20passing-bc002d)](tests/)
 [![Safety: fail-closed](https://img.shields.io/badge/safety-fail--closed%20%C2%B7%20dry--run%20default-bc002d)](docs/SAFE_USE.md)
 
-![SAKI-MORI — proactive defense for servers you own](docs/assets/social-preview.png)
+![BOGYO — proactive defense for servers you own](docs/assets/social-preview.png)
 
 **Proactive, consent-gated defense for Linux servers you own.**
 Find and fix your own vulnerabilities before attackers do — and let your own servers
 harden each other — all behind a single authorization gate that **fails closed**.
 
 > ⚠️ **For assets you own or are explicitly authorized (in writing) to test — nothing else.**
-> SAKI-MORI refuses any target outside your signed ownership scope. It never attacks third
+> BOGYO refuses any target outside your signed ownership scope. It never attacks third
 > parties and never "hacks back". Read the [Terms of Use](TERMS_OF_USE.md),
 > [Disclaimer](DISCLAIMER.md), [Safe-Use Request](docs/SAFE_USE.md) and
 > [legal notes](docs/legal.md) before use.
 
-*The name:* the **sakimori** were the frontier guards of ancient Japan. They held their own
-ground and did not strike beyond it; read literally, *saki* is "ahead" and *mori* is "to
-guard". That is the design in one word — **get there first, on your own ground, and never
-counter-attack.**
+*The name:* **bōgyo** is the Japanese word for *defense* — the opposite of attack, not a
+counter-attack. That is the design in one word: **get there first, hold your own ground,
+and never strike back.**
 
 ---
 
 ## The idea at a glance
 
 AI is accelerating attacks: intrusion tooling now iterates faster than people can patch.
-SAKI-MORI does not answer with offense. It **out-paces attackers on its own ground**:
+BOGYO does not answer with offense. It **out-paces attackers on its own ground**:
 
-| | Principle | What SAKI-MORI does |
+| | Principle | What BOGYO does |
 |---|---|---|
 | 1 | **Find first** | Continuously checks *your own* servers, confirms findings in an isolated sandbox, and fixes them before an attacker gets there. |
 | 2 | **Link your own machines** | Runs on several servers you own; each specializes in a patch domain (e.g. `sshd`, `nginx`), so patches are produced in parallel. |
@@ -44,7 +43,7 @@ flowchart LR
     A[AI-accelerated attacks] -->|race| D{Who patches first?}
     D -->|attacker wins| X[Breach]
     D -->|we win| W[Proactive fix]
-    subgraph SM [SAKI-MORI]
+    subgraph BG [BOGYO]
       S1[Find your own<br/>vulns first] --> S2[Fix & harden]
       S2 --> S3[Share across<br/>your servers]
       S3 --> S1
@@ -134,7 +133,7 @@ pip install -e ".[dev]"        # extras: ".[tui]" dashboard, ".[agent]" LangGrap
 cp config/scope.example.yaml config/scope.yaml
 cp config/settings.example.yaml config/settings.yaml
 # edit config/scope.yaml so it lists ONLY assets you own
-sentinel init                  # create config/ + state/, consent keypair (alias: sakimori)
+sentinel init                  # create config/ + state/, consent keypair (alias: bogyo)
 sentinel keygen                # scope signing keypair
 sentinel sign-scope            # sign scope.yaml
 sentinel consent               # read and accept the clauses, sign consent
@@ -193,7 +192,7 @@ Python 3.11–3.13.
 
 ## Responsible use, disclaimer and legal notes
 
-By using SAKI-MORI you accept the [Terms of Use](TERMS_OF_USE.md) and the
+By using BOGYO you accept the [Terms of Use](TERMS_OF_USE.md) and the
 [Disclaimer](DISCLAIMER.md). In short:
 
 - **Authorized use only.** Only systems you own or are authorized in writing to test.
@@ -205,7 +204,7 @@ By using SAKI-MORI you accept the [Terms of Use](TERMS_OF_USE.md) and the
   your contracts, hosting-provider terms and organizational policies.
 - **Not legal or security advice.** The documentation describes the engineering; consult
   qualified professionals for your situation.
-- **Automated actions.** With capabilities enabled and dry-run off, SAKI-MORI can change
+- **Automated actions.** With capabilities enabled and dry-run off, BOGYO can change
   firewall rules and configuration files on a schedule. Review, approve, keep backups, and
   test in a safe environment first.
 - **Cryptography.** The mesh channel and machine-bound key are a pragmatic design on
@@ -221,6 +220,6 @@ By using SAKI-MORI you accept the [Terms of Use](TERMS_OF_USE.md) and the
 ## License
 
 [MIT](LICENSE) with an additional use notice (authorized, defensive use only).
-SAKI-MORI was previously named *Sentinel-Guard*: the repository URL, the Python package
-(`sentinel`) and the CLI command (`sentinel`, alias `sakimori`) keep the old name for
+BOGYO was previously named *Sentinel-Guard*: the repository URL, the Python package
+(`sentinel`) and the CLI command (`sentinel`, alias `bogyo`) keep the old name for
 compatibility.

@@ -1,6 +1,6 @@
 # Disclaimer
 
-**Read this before using SAKI-MORI.**
+**Read this before using BOGYO.**
 
 1. **No warranty.** The software is provided "AS IS", without warranty of any kind,
    express or implied, including merchantability, fitness for a particular purpose,

@@ -4,7 +4,7 @@ Run the distributed parallel-patch mesh between **two servers you own** (A and B
 each specializing in a different patch domain, sharing patches over the rolling-key
 channel and a signed patch chain. Use only your own servers (consent requires it).
 
-> Prereqs on each server: install SAKI-MORI, run `sentinel init` → edit
+> Prereqs on each server: install BOGYO, run `sentinel init` → edit
 > `config/scope.yaml` (that server's own assets) → `keygen` → `sign-scope` →
 > `consent` (accept the "own servers only" clause). Put the two servers on a
 > private network (e.g. WireGuard) and only expose the mesh port there.

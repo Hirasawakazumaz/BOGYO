@@ -1,4 +1,4 @@
-"""SAKI-MORI: authorized, consent-gated proactive defense for Linux servers.
+"""BOGYO: authorized, consent-gated proactive defense for Linux servers.
 
 Design rule (non-negotiable): every active capability is routed through a single
 guard (``sentinel.guards.scope_guard``). If consent, a signed scope, or the

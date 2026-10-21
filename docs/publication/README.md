@@ -1,8 +1,8 @@
-# SAKI-MORI Documentation
+# BOGYO Documentation
 
-> **Status: prepared for publication.** These documents describe SAKI-MORI 0.1.0.
+> **Status: prepared for publication.** These documents describe BOGYO 0.1.0.
 
-> **Snapshot note:** these documents describe the SAKI-MORI 0.1.0 code as of 2026-10-18. Since then the multi-node mesh has been **implemented** (rolling-key channel, signed patch chain, and a sandbox conflict gate before apply) — see [../WHITEPAPER.md](../WHITEPAPER.md) §4 and [../MESH_SETUP.md](../MESH_SETUP.md). Statements below that call the mesh a proposal or "not implemented" are out of date.
+> **Snapshot note:** these documents describe the BOGYO 0.1.0 code as of 2026-10-18. Since then the multi-node mesh has been **implemented** (rolling-key channel, signed patch chain, and a sandbox conflict gate before apply) — see [../WHITEPAPER.md](../WHITEPAPER.md) §4 and [../MESH_SETUP.md](../MESH_SETUP.md). Statements below that call the mesh a proposal or "not implemented" are out of date.
 
 | # | Document | Contents | For |
 |---|----------|----------|-----|
@@ -22,7 +22,7 @@ Every capability is labelled in these documents:
 - **[Implemented]** — exists as code in this repository and is covered by tests.
 - **[Proposal — not implemented]** — design and proposed architecture only; there is no code yet.
 
-In particular, **multi-PC cooperation and the blockchain-based composite ledger ("SAKI-MORI Mesh") are proposals and are not implemented.**
+In particular, **multi-PC cooperation and the blockchain-based composite ledger ("BOGYO Mesh") are proposals and are not implemented.**
 What the code has today is their foundation: a **single-node hash-chained audit log**, **Ed25519 signatures** and **canonical hashing**.
 
 ## Accompanying material

@@ -464,7 +464,7 @@ def cmd_resume(args) -> int:
 # --------------------------------------------------------------------------- #
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="sentinel", description="Authorized proactive defense (own assets only).")
-    p.add_argument("--version", action="version", version=f"saki-mori {__version__}")
+    p.add_argument("--version", action="version", version=f"bogyo {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def with_settings(sp):
@@ -519,10 +519,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("schedule", help="emit systemd timer + cron for periodic defensive runs")
     sp.add_argument("--command", required=True, help="sentinel args to schedule, e.g. 'block --from-logs /var/log/auth.log'")
-    sp.add_argument("--name", default="saki-mori")
+    sp.add_argument("--name", default="bogyo")
     sp.add_argument("--on-calendar", default="daily")
     sp.add_argument("--user", default="root")
-    sp.add_argument("--workdir", default="/opt/saki-mori")
+    sp.add_argument("--workdir", default="/opt/bogyo")
     sp.set_defaults(func=cmd_schedule)
 
     sp = with_settings(sub.add_parser("report", help="build a run report from the audit log"))

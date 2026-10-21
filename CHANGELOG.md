@@ -38,8 +38,8 @@ First public release.
   run reports, LangGraph orchestration (optional extra).
 
 ### Project
-- Project renamed **SAKI-MORI** (formerly Sentinel-Guard). The Python package and the
-  `sentinel` command keep their names; `sakimori` is added as an alias command.
+- Project renamed **BOGYO** (formerly Sentinel-Guard). The Python package and the
+  `sentinel` command keep their names; `bogyo` is added as an alias command.
 - Ink, off-white and crimson visual identity (README banner, social preview, TUI theme).
 - Fixed: the TUI crashed on its pipeline timer with current Textual releases.
 - English documentation: whitepaper, mesh setup, publication set (concept &

@@ -177,25 +177,28 @@ def cmd_consent(args) -> int:
 
 def cmd_status(args) -> int:
     settings = _load_settings(args.settings)
-    _print(f"sentinel-guard {__version__}")
-    _print(f"dry_run: {settings.dry_run}")
-    _print(f"toggles: {settings.toggles.model_dump()}")
-    _print(f"limits : {settings.limits.model_dump()}")
+    _print(tr("cli.status.header", ver=__version__))
+    _print(tr("cli.status.dry_run", v=settings.dry_run))
+    _print(tr("cli.status.toggles", v=settings.toggles.model_dump()))
+    _print(tr("cli.status.limits", v=settings.limits.model_dump()))
     try:
         scope = load_verified_scope(
             settings.paths.scope_file, settings.paths.scope_sig_file, settings.paths.scope_pubkey_file
         )
-        _print(f"scope  : VERIFIED  hash={scope.scope_hash()[:16]}…  hosts={len(scope.allowed_hosts)} cidrs={len(scope.allowed_cidrs)}")
+        _print(tr("cli.status.scope_ok", h=scope.scope_hash()[:16],
+                  hosts=len(scope.allowed_hosts), cidrs=len(scope.allowed_cidrs)))
         try:
             verify_consent(settings.paths.consent_file, settings.paths.consent_pubkey_file, scope.scope_hash())
-            _print("consent: VERIFIED")
+            _print(tr("cli.status.consent_ok"))
         except SentinelError as exc:
-            _print(f"consent: NOT VALID — {exc}")
+            _print(tr("cli.status.consent_bad", msg=exc))
     except SentinelError as exc:
-        _print(f"scope  : NOT VERIFIED — {exc}")
+        _print(tr("cli.status.scope_bad", msg=exc))
     audit = AuditLog(settings.paths.audit_file)
-    _print(f"audit  : {'intact' if audit.verify_chain() else 'TAMPERED'}  ({settings.paths.audit_file})")
-    _print(f"kill   : {'ENGAGED' if Path(settings.paths.killswitch_file).exists() else 'clear'}")
+    state = tr("status.intact") if audit.verify_chain() else tr("status.tampered")
+    _print(tr("cli.status.audit", state=state, path=settings.paths.audit_file))
+    killed = Path(settings.paths.killswitch_file).exists()
+    _print(tr("cli.status.kill_engaged" if killed else "cli.status.kill_clear"))
     return 0
 
 
@@ -224,8 +227,8 @@ def cmd_block(args) -> int:
         return 0
     for sig in signals:
         result = blocker.block_ip(sig.ip, ttl_seconds=args.ttl)
-        mode = "DRY-RUN" if result.dry_run else "APPLIED"
-        _print(f"[{mode}] {sig.ip} (x{sig.count}) -> {result.command}")
+        mode = tr("cli.dry") if result.dry_run else tr("cli.applied")
+        _print(tr("cli.block.line", mode=mode, ip=sig.ip, count=sig.count, cmd=result.command))
     return 0
 
 
@@ -233,8 +236,8 @@ def cmd_scan(args) -> int:
     settings = _load_settings(args.settings)
     guard = ScopeGuard.from_settings(settings)
     plan = Scanner(guard).scan(args.target, tool=args.tool)
-    mode = "DRY-RUN" if plan.dry_run else f"rc={plan.returncode}"
-    _print(f"[{mode}] {plan.tool} {plan.target}: {' '.join(plan.command)}")
+    mode = tr("cli.dry") if plan.dry_run else tr("cli.scan.rc", rc=plan.returncode)
+    _print(tr("cli.scan.line", mode=mode, tool=plan.tool, target=plan.target, cmd=" ".join(plan.command)))
     if plan.output:
         _print(plan.output)
     return 0

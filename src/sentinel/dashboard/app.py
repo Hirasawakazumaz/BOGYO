@@ -178,9 +178,9 @@ class SentinelDashboardApp(App):
     def on_mount(self) -> None:
         self.action_refresh()
         self.set_interval(self.refresh_interval, self.action_refresh)
-        self.set_interval(0.2, self._animate)  # anime-style pipeline flow
+        self.set_interval(0.2, self._tick_pipeline)  # anime-style pipeline flow (not `_animate`: Textual uses that name)
 
-    def _animate(self) -> None:
+    def _tick_pipeline(self) -> None:
         self._frame += 1
         try:
             self.query_one("#pipeline", Static).update(

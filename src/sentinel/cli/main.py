@@ -28,7 +28,7 @@ import json as _json
 
 from .. import __version__
 from .. import control
-from ..i18n import LANGUAGES, normalize_lang, t
+from ..i18n import t
 from ..block import FirewallBlocker
 from ..core import killswitch
 from ..core.audit import AuditLog
@@ -87,25 +87,14 @@ def cmd_init(args) -> int:
     Path("state").mkdir(exist_ok=True)
     ensure_consent_keypair("config/consent.key", "config/consent.pub")
 
-    # Language selection (first thing at install): --lang, else prompt, else en.
-    lang = args.lang
-    if not lang:
-        try:
-            lang = input("Choose language / 言語を選択 [en/ja] (en): ").strip()
-        except EOFError:
-            lang = "en"
-    lang = normalize_lang(lang or "en")
-    global _LANG
-    _LANG = lang
-
-    # Scaffold / update settings.yaml with the chosen language (keeps existing values).
+    # Scaffold settings.yaml (keeps existing values).
     settings_path = Path(args.settings)
     settings = Settings.load(settings_path) if settings_path.exists() else Settings()
-    settings.ui.language = lang
+    settings.ui.language = "en"
     settings.save(settings_path)
 
     _print(tr("cli.init.welcome"))
-    _print(tr("cli.init.done", lang=lang))
+    _print(tr("cli.init.done"))
     _print(tr("cli.init.next", path=str(settings_path)))
     return 0
 
@@ -482,8 +471,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--settings", default=DEFAULT_SETTINGS)
         return sp
 
-    sp = with_settings(sub.add_parser("init", help="scaffold config/state, pick language, make consent keypair"))
-    sp.add_argument("--lang", default="", choices=["", *LANGUAGES], help="UI language (en/ja); prompts if omitted")
+    sp = with_settings(sub.add_parser("init", help="scaffold config/state, make consent keypair"))
     sp.set_defaults(func=cmd_init)
     sub.add_parser("keygen").set_defaults(func=cmd_keygen)
 

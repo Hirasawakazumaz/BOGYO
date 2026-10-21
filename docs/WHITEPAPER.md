@@ -1,36 +1,32 @@
-# Sentinel-Guard — Whitepaper / ホワイトペーパー
+# Sentinel-Guard — Whitepaper
 
 *Proactive, consent-gated, distributed defense for servers you own.*
-*自分が所有するサーバーのための、同意ゲート付き・プロアクティブな分散防御。*
 
 > This document explains the philosophy, architecture, and safety model. It is an
 > engineering design paper, **not** legal advice, and the software is for use on
-> the operator's own, authorized assets only. / 本書は設計の解説であり法的助言では
-> ありません。本ソフトは利用者自身の認可済み資産のみを対象とします。
+> the operator's own, authorized assets only.
 
 ---
 
-## 1. Philosophy / 思想
+## 1. Philosophy
 
 Modern attacks are increasingly **AI-accelerated**: malware and intrusion tooling
 iterate faster than human defenders can patch. The response this project takes is
 not to attack back, but to **out-pace attackers on our own ground**:
 
-AIにより高速化する攻撃に対し、反撃ではなく「自分の陣地で先回りする」発想:
-
-1. **Find first (先に見つける)** — continuously discover *your own* server's
+1. **Find first** — continuously discover *your own* server's
    vulnerabilities before an attacker does, and fix them.
-2. **Link many machines (複数PC連動)** — run the same software on several servers
+2. **Link many machines** — run the same software on several servers
    you own, each specializing in a different patch domain, working in parallel.
-3. **Strengthen by blockchain composition (ブロックチェーンで強化)** — the servers
+3. **Strengthen by blockchain composition** — the servers
    share their patches over a private, signed chain and only apply a peer's patch
    after verifying it causes no conflict, so the fleet hardens itself cooperatively.
 
 ```mermaid
 flowchart LR
-    A[AI-accelerated attacks<br/>AIで高速化する攻撃] -->|race| D{Who patches first?}
-    D -->|attacker wins| X[Breach / 侵害]
-    D -->|we win| W[Proactive fix / 先回り防御]
+    A[AI-accelerated attacks] -->|race| D{Who patches first?}
+    D -->|attacker wins| X[Breach]
+    D -->|we win| W[Proactive fix]
     subgraph Sentinel-Guard
       S1[Find your own<br/>vulns first] --> S2[Fix & harden]
       S2 --> S3[Share across<br/>your servers]
@@ -39,25 +35,22 @@ flowchart LR
     W --- S1
 ```
 
-**Non-goals (やらないこと):** no hack-back, no attacking systems you do not own,
+**Non-goals:** no hack-back, no attacking systems you do not own,
 no new exploit development, no detection evasion. These are excluded by design.
 
 ---
 
-## 2. System architecture / システム構成
+## 2. System architecture
 
 Every active capability is routed through a single, bypass-proof **guard** that
 fails closed unless a signed ownership scope and operator consent are present.
 
-全ての能動機能は、署名済みスコープと同意が揃わなければ fail-closed になる単一の
-`ScopeGuard` を必ず通ります。
-
 ```mermaid
 flowchart TB
-    subgraph Safety core / 安全コア
-      SC[signed scope + consent<br/>署名スコープ+同意]
+    subgraph Safety core
+      SC[signed scope + consent]
       G[ScopeGuard<br/>single authz path]
-      AU[hash-chained audit log<br/>改竄検知監査]
+      AU[hash-chained audit log]
       KS[kill-switch]
       SC --> G
       G --> AU
@@ -83,34 +76,28 @@ flowchart TB
 
 ---
 
-## 3. Patch-creation pipeline / パッチ制作工程
+## 3. Patch-creation pipeline
 
 ```mermaid
 flowchart LR
-    I[intake 取込] --> S[scan 診断]
-    S --> B[sandbox 検証<br/>Docker replica]
-    B --> P[propose 生成<br/>rules / local AI / Claude]
-    P --> E[conflict-eval 競合検査<br/>in sandbox]
+    I[intake] --> S[scan]
+    S --> B[sandbox<br/>Docker replica]
+    B --> P[propose<br/>rules / local AI / Claude]
+    P --> E[conflict-eval<br/>in sandbox]
     E -->|conflict| P
-    E -->|clean| A[apply 適用<br/>human-approved]
+    E -->|clean| A[apply<br/>human-approved]
 ```
 
 A patch is only applied to a real host after it passes the conflict check in the
 sandbox **and** an explicit human approval; never automatically on production.
 
-パッチは、サンドボックスでの競合検査に合格し、かつ人の明示承認を得た場合のみ実ホストへ
-適用されます（本番への自動適用はしません）。
-
 ---
 
-## 4. Distributed parallel-patch mesh / 分散並列パッチ網
+## 4. Distributed parallel-patch mesh
 
 Servers the operator owns form a private mesh. Each node specializes in a patch
 domain (e.g. one does `sshd`, another `nginx`), so patches are produced in
 parallel, then shared and cross-verified before being applied.
-
-利用者が所有するサーバー同士が私的メッシュを構成。各ノードが担当領域（例: sshd / nginx）
-を分担して並列にパッチを作り、共有・相互検証してから適用します。
 
 ```mermaid
 flowchart TB
@@ -131,7 +118,7 @@ flowchart TB
     NodeC <-->|rolling-key channel| NodeA
 ```
 
-### 4.1 Authentication & the rolling-key channel / 認証とローリング鍵通信
+### 4.1 Authentication & the rolling-key channel
 
 - **Identity, not an API key**: each node holds an Ed25519+X25519 key stored in a
   **machine-bound, passphrase-encrypted file** (scrypt over passphrase + machine
@@ -156,14 +143,11 @@ sequenceDiagram
     Note over A,B: wrong/old key ⇒ AEAD auth fails ⇒ rejected
 ```
 
-### 4.2 Blockchain of patches / パッチのブロックチェーン
+### 4.2 Blockchain of patches
 
 Each shared or applied patch is a **signed block** linked by hash to the previous
 one. The chain gives a tamper-evident, ordered, cross-signed record of what every
 node proposed and what was verified and applied.
-
-共有/適用された各パッチは、前ブロックにハッシュで連結された**署名済みブロック**。チェーンは
-改竄検知可能で順序付き・相互署名された記録になります。
 
 ```mermaid
 flowchart LR
@@ -179,9 +163,9 @@ cannot break another.
 
 ---
 
-## 5. Threat model & safety / 脅威モデルと安全性
+## 5. Threat model & safety
 
-| Risk / リスク | Mitigation / 対策 |
+| Risk | Mitigation |
 |---|---|
 | Pointing the tool at systems you don't own | Signed ownership scope; guard refuses out-of-scope targets (fail closed) |
 | Accidental production attack | Red-team is sandbox-only, hard-refused on production; dry-run default |
@@ -196,13 +180,10 @@ See also [legal.md](legal.md), [threat-model.md](threat-model.md),
 
 ---
 
-## 6. Using it / 使い方 (summary)
-
-English is the default; Japanese is selectable at first run (`sentinel init`, or
-`ui.language`). 既定は英語で、初回 `sentinel init` または `ui.language` で日本語に。
+## 6. Using it (summary)
 
 ```
-sentinel init           # choose language, scaffold config/state, consent keypair
+sentinel init           # scaffold config/state, consent keypair
 # edit config/scope.yaml  → your OWN hosts/CIDRs only
 sentinel keygen         # scope signing keypair
 sentinel sign-scope     # sign the scope

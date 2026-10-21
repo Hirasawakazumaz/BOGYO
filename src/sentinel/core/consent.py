@@ -34,29 +34,25 @@ from .signing import (
 REQUIRED_CLAUSES: dict[str, str] = {
     "ownership": (
         "I attest that I own or am explicitly authorized to test every host and "
-        "network listed in the scope. / スコープに記載の全ホスト・ネットワークを"
-        "私が所有、または明示的にテスト許可を得ていることを誓約します。"
+        "network listed in the scope."
     ),
     "no_third_party": (
         "I will not point this tool at any system I do not own/control, and I will "
-        "not use it to attack or retaliate against third parties. / 第三者のシステムへ"
-        "の使用・攻撃・反撃（ハックバック）を行いません。"
+        "not use it to attack or retaliate against third parties."
     ),
     "no_misuse_redistribution": (
         "I will not modify or redistribute this tool to remove its safeguards or to "
-        "enable misuse. / 安全機構を除去・改変したり、悪用目的で再配布しません。"
+        "enable misuse."
     ),
     "legal_compliance": (
         "I will comply with all applicable laws (e.g. Japan Unauthorized Computer "
         "Access Act and Penal Code Art.168-2/168-3/234-2, US CFAA, UK CMA, DE StGB "
-        "202c). / 関連法令（不正アクセス禁止法、刑法168条の2・3／234条の2、CFAA、"
-        "CMA、独202c 等）を順守します。"
+        "202c)."
     ),
     "mesh_own_servers_only": (
         "If I enable the distributed patch mesh, I will connect it ONLY to servers I "
         "myself own and run this same software on; I will not peer with third-party or "
-        "others' machines. / 分散パッチメッシュを有効化する場合、本ソフトを導入した"
-        "自分自身が所有・運用するサーバーとだけ接続し、第三者や他者のマシンとは接続しません。"
+        "others' machines."
     ),
 }
 

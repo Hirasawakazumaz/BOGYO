@@ -16,7 +16,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static, Switch
 
 from ..core.config import Settings
-from ..i18n import normalize_lang, t
+from ..i18n import t
 from .model import DashboardModel
 from .snapshot import _attack_graph, pipeline_lines
 
@@ -52,7 +52,6 @@ class ConfigScreen(Screen):
             yield Label(t("cfg.hint", L))
 
             yield Label(f"── {t('cfg.general', L)} ──", classes="title")
-            yield Label(t("cfg.language", L)); yield Input(value=s.ui.language, id="language")
             with Horizontal():
                 yield Label(t("cfg.dry_run", L)); yield Switch(value=s.dry_run, id="dry_run")
             yield Label(t("cfg.home_country", L)); yield Input(value=s.geo.home_country, id="home_country")
@@ -95,7 +94,6 @@ class ConfigScreen(Screen):
         s = self.settings
         q = self.query_one
         try:
-            s.ui.language = normalize_lang(q("#language", Input).value)
             s.dry_run = q("#dry_run", Switch).value
             s.geo.home_country = q("#home_country", Input).value.strip().upper()[:2]
             s.geo.home_label = q("#home_label", Input).value.strip()

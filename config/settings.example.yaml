@@ -6,7 +6,7 @@
 dry_run: true
 
 ui:
-  language: en                  # en | ja  (chosen at `sentinel init`; editable via `sentinel config set ui.language ja`)
+  language: en                  # English only
 
 # Every active capability is opt-in and defaults to false (default-deny).
 toggles:

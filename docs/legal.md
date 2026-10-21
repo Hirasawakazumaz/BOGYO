@@ -9,16 +9,16 @@ Acting on systems **without authorization** is not, in essentially every jurisdi
 Sentinel-Guard enforces the former with a signed scope and consent, and refuses the
 latter by design.
 
-## Japan / 日本
-- **不正アクセス禁止法** — Prohibits unauthorized access to others' computers. Testing
+## Japan
+- **Unauthorized Computer Access Act** — Prohibits unauthorized access to others' computers. Testing
   your own servers with your own authority is not "unauthorized access". Third-party
   targets without written authorization would violate this. The signed scope enforces
   self-ownership.
-- **刑法168条の2・168条の3（不正指令電磁的記録に関する罪）** — Creating/providing
+- **Penal Code Arts. 168-2 / 168-3 (unauthorized command electromagnetic records)** — Creating/providing
   malware without legitimate cause. Sentinel-Guard ships no new exploit code and no
   generic attack payloads; it orchestrates legitimate, widely-used tools (nmap, nuclei,
   OWASP ZAP, trivy) for defense and authorized self-testing, with safeguards and terms.
-- **刑法234条の2（電子計算機損壊等業務妨害）／DoS** — Damaging/obstructing others'
+- **Penal Code Art. 234-2 (obstruction of business by damaging a computer) / DoS** — Damaging/obstructing others'
   systems. Out of scope by design; attacks run only against your own isolated replicas.
 - **Hack-back** — Retaliating against an attacker is not permitted under Japanese law.
   The tool only drops inbound traffic; it never sends traffic back to an attacker.

@@ -82,7 +82,7 @@ def test_validate_executes_when_not_dry_run(make_env):
 
 
 # --------------------------------------------------------------------------- #
-# command escalation (string-level补, primary defense is compose structure)
+# command escalation (string-level backstop; primary defense is compose structure)
 # --------------------------------------------------------------------------- #
 def test_privileged_is_refused_in_validation(make_env):
     guard = _guard(make_env, enable_sandbox_redteam=True)

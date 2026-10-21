@@ -80,7 +80,7 @@ class IntakeConfig(BaseModel):
 class UIConfig(BaseModel):
     """User-interface preferences (chosen at init; editable via the control API)."""
 
-    language: str = "en"  # "en" | "ja"
+    language: str = "en"  # English only; kept for settings compatibility
 
 
 class GeoConfig(BaseModel):

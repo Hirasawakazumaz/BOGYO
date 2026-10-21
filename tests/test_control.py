@@ -30,9 +30,9 @@ def test_config_set_bool_and_nested(make_env, tmp_path):
     s, sp = _settings_file(make_env(), tmp_path)
     control.set_value(s, "dry_run", "false", sp)
     control.set_value(Settings.load(sp), "toggles.enable_blocking", "true", sp)
-    control.set_value(Settings.load(sp), "ui.language", '"ja"', sp)
+    control.set_value(Settings.load(sp), "ui.language", '"en"', sp)
     out = Settings.load(sp)
-    assert out.dry_run is False and out.toggles.enable_blocking is True and out.ui.language == "ja"
+    assert out.dry_run is False and out.toggles.enable_blocking is True and out.ui.language == "en"
 
 
 def test_config_set_forbidden_path_refused(make_env, tmp_path):
@@ -53,11 +53,11 @@ def test_state_dict_is_json_serializable(make_env, tmp_path):
     assert "home_country" in d and "attackers" in d and "usage" in d
 
 
-def test_i18n_en_ja():
-    assert t("panel.status", "ja") == "防御ステータス"
+def test_i18n_english_only():
     assert t("panel.status", "en") == "DEFENSE STATUS"
-    assert t("nonexistent.key", "ja") == "nonexistent.key"  # falls back to key
-    assert normalize_lang("JA") == "ja" and normalize_lang("xx") == "en"
+    assert t("panel.status", "ja") == "DEFENSE STATUS"  # legacy setting -> English
+    assert t("nonexistent.key") == "nonexistent.key"  # falls back to key
+    assert normalize_lang("JA") == "en" and normalize_lang("xx") == "en"
 
 
 def test_static_geo_map_resolves_offline():

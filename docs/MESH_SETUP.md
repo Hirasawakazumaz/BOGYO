@@ -1,10 +1,8 @@
-# Mesh setup — two of your own servers / 自分のサーバー2台でメッシュを動かす
+# Mesh setup — two of your own servers
 
 Run the distributed parallel-patch mesh between **two servers you own** (A and B),
 each specializing in a different patch domain, sharing patches over the rolling-key
 channel and a signed patch chain. Use only your own servers (consent requires it).
-自分が所有する2台(A・B)で、担当領域を分け、ローリング鍵通信＋署名チェーンでパッチを
-共有します。接続は自分のサーバー同士のみ（同意条項）。
 
 > Prereqs on each server: install Sentinel-Guard, run `sentinel init` → edit
 > `config/scope.yaml` (that server's own assets) → `keygen` → `sign-scope` →
@@ -13,7 +11,7 @@ channel and a signed patch chain. Use only your own servers (consent requires it
 
 Assume A = `10.8.0.1`, B = `10.8.0.2`, mesh port `8787`.
 
-## 1. Create a node key on EACH server / 各サーバーでノード鍵を作成
+## 1. Create a node key on EACH server
 ```bash
 # on A
 sentinel mesh keygen --name serverA          # prompts for a passphrase
@@ -23,7 +21,7 @@ sentinel mesh keygen --name serverB
 Each prints its **public** keys (`ed25519_pub`, `x25519_pub`). The key file
 (`config/node.key.enc`) is machine-bound + passphrase-encrypted — do not copy it.
 
-## 2. Exchange PUBLIC keys and fill `mesh:` in settings.yaml / 公開鍵を交換し設定
+## 2. Exchange PUBLIC keys and fill `mesh:` in settings.yaml
 Copy the `mesh:` block from [../config/mesh.example.yaml](../config/mesh.example.yaml)
 into each server's `config/settings.yaml`. On A, list B as a peer; on B, list A.
 `time_window_seconds` must match on both.
@@ -44,7 +42,7 @@ mesh:                                    mesh:
 You can also set these over the control API, e.g.
 `sentinel config set mesh.enabled true`.
 
-## 3. Start each node's endpoint / 各ノードのエンドポイントを起動
+## 3. Start each node's endpoint
 ```bash
 # on A (listens for B)                   # on B (listens for A)
 sentinel mesh serve --host 10.8.0.1 --port 8787
@@ -55,19 +53,18 @@ sentinel mesh serve --host 10.8.0.2 --port 8787
 `serve` builds the ScopeGuard first (refuses to start without a valid signed scope
 + consent) and gates every received patch through the **sandbox ConflictEvaluator**.
 Give it a sandbox replica and/or local checks to make that gate able to pass:
-`serve` は ScopeGuard を必ず構築し、受信パッチはサンドボックスの競合検査を通ります。
 ```bash
 sentinel mesh serve --host 10.8.0.2 --port 8787 \
   --replica sbx-nginx.internal --compose docker/replica.yml      # default: restart check
   # or/also: --check startup='docker compose -p sentinel_sbx_sbx_nginx_internal restart nginx'
 ```
-Fail-closed rules / 安全側の規則: a peer's patch is recorded `applied` **only** if
+Fail-closed rules: a peer's patch is recorded `applied` **only** if
 the checks really ran in the sandbox and all passed. In `dry_run: true` (default),
 with no checks, with no patch content (`hardened`) in the block, or on a hash
 mismatch / guard refusal, it stays `shared` and the ack carries the `reason`.
 Checks come only from the local operator — never from a peer's payload.
 
-## 4. Propose a patch on one node and share it / パッチを作って共有
+## 4. Propose a patch on one node and share it
 ```bash
 # on A: create a signed patch block for A's domain
 sentinel mesh propose --service sshd --finding CVE-2024-6387 --path /etc/ssh/sshd_config
@@ -80,12 +77,12 @@ checks really ran and passed) records it as applied on its chain: `peer ack: app
 ref=…`. Otherwise you'll see `peer ack: shared` (e.g. dry-run, or a block without
 patch content — CLI `propose` blocks currently carry metadata only).
 
-## 5. Verify the shared chain / 共有チェーンを確認
+## 5. Verify the shared chain
 ```bash
 sentinel mesh status          # on either node: height / pending / applied / valid
 ```
 
-## How the security works (summary) / 仕組み（要約）
+## How the security works (summary)
 - **Auth** is a machine-bound encrypted node key, not a copyable API key.
 - The **session key changes every message**, derived from the previously exchanged
   ciphertext + the time window; a peer is accepted only if its key matches, and
@@ -95,7 +92,7 @@ sentinel mesh status          # on either node: height / pending / applied / val
 
 See [WHITEPAPER.md](WHITEPAPER.md) §4 for diagrams, and [SAFE_USE.md](SAFE_USE.md).
 
-## Troubleshooting / トラブルシュート
+## Troubleshooting
 - `peer '…' not in mesh.peers` → the `--to` name must match a `peers[].name`.
 - `no endpoint` → set `peers[].endpoint` or pass `--endpoint http://host:port`.
 - 400 / key errors → check both sides share the same `time_window_seconds`, the

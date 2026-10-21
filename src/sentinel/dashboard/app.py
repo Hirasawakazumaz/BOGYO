@@ -2,7 +2,8 @@
 
 A live "global defense grid": a colored world map with attacker->home arrows,
 status/usage panels, and a config screen to edit settings from the TUI. Styling
-is a green/cyan-on-black cyber / CASIO-world-map aesthetic.
+uses a sumi-ink background, off-white text and a single crimson accent;
+status colors (green ok / red breach / amber pending) keep their meaning.
 """
 
 from __future__ import annotations
@@ -21,17 +22,17 @@ from .model import DashboardModel
 from .snapshot import _attack_graph, pipeline_lines
 
 CYBER_CSS = """
-Screen { background: #020a06; color: #39ff14; }
-Header { background: #041a0e; color: #00e0ff; text-style: bold; }
-Footer { background: #041a0e; color: #39ff14; }
-#pipeline { color: #ffd500; background: #010704; border: round #0fae6e; padding: 0 1; height: auto; }
-.panel { border: round #0b6; background: #04120a; color: #7CFFb0; height: auto; }
+Screen { background: #121216; color: #ece8e1; }
+Header { background: #1c1b20; color: #ece8e1; text-style: bold; }
+Footer { background: #1c1b20; color: #c9c3b8; }
+#pipeline { color: #e9c46a; background: #0e0e11; border: round #bc002d; padding: 0 1; height: auto; }
+.panel { border: round #4a4850; background: #18171c; color: #ece8e1; height: auto; }
 .wide { width: 1fr; }
-.title { color: #00e0ff; text-style: bold; }
-Button { background: #0c7; color: #021; text-style: bold; }
-Input { background: #06230f; color: #39ff14; border: tall #0fae6e; }
-Switch { background: #06230f; }
-Label { color: #7CFFb0; }
+.title { color: #e0485b; text-style: bold; }
+Button { background: #bc002d; color: #f5f2eb; text-style: bold; }
+Input { background: #1f1e24; color: #ece8e1; border: tall #bc002d; }
+Switch { background: #1f1e24; }
+Label { color: #c9c3b8; }
 """
 
 
@@ -184,7 +185,7 @@ class SentinelDashboardApp(App):
         self._frame += 1
         try:
             self.query_one("#pipeline", Static).update(
-                f"[b cyan]{t('panel.pipeline', self._lang)}[/]\n[#ffd500]"
+                f"[b #e0485b]{t('panel.pipeline', self._lang)}[/]\n[#e9c46a]"
                 + "\n".join(pipeline_lines(self._stage, self._frame, self._lang)) + "[/]"
             )
         except Exception:  # noqa: BLE001 - widget not mounted yet
@@ -212,7 +213,7 @@ class SentinelDashboardApp(App):
         tests = state.tests or {}
         none_yet = t("lbl.none_yet", lang)
         self.query_one("#status", Static).update(
-            f"[b cyan]{t('panel.status', lang)}[/]\n"
+            f"[b #e0485b]{t('panel.status', lang)}[/]\n"
             f"{t('lbl.blocked_ips', lang)} : {len(state.blocked_ips)}\n{t('lbl.breaches', lang)} : {state.breaches}\n"
             f"{t('lbl.vulns', lang)} : {state.vuln_count}\n{t('lbl.authorizations', lang)} : {state.allows}/{state.denies}\n"
             f"{t('lbl.tests', lang)} : {tests.get('passed','?')}/{tests.get('total','?')}\n"
@@ -220,18 +221,18 @@ class SentinelDashboardApp(App):
         )
         if u:
             self.query_one("#usage", Static).update(
-                f"[b cyan]{t('panel.usage', lang)}[/]\n{t('lbl.provider', lang)}: {u.provider}  {t('lbl.level', lang)}: {u.level}\n"
+                f"[b #e0485b]{t('panel.usage', lang)}[/]\n{t('lbl.provider', lang)}: {u.provider}  {t('lbl.level', lang)}: {u.level}\n"
                 f"{t('lbl.model', lang)}: {u.model}\n{t('lbl.tokens_today', lang)}: {u.tokens_today:,}/{u.budget:,}\n"
                 f"{u.bar(24)} {int(u.fraction*100)}%\n{t('lbl.runs_per_hour', lang)}: {u.runs_per_hour}  "
                 f"{t('lbl.run_allowed', lang)}: {'YES' if u.allow_run else 'STOP'}\n{t('lbl.resets', lang)}: {u.resets_at[:16]}"
             )
         self.query_one("#ips", Static).update(
-            f"[b cyan]{t('panel.ips', lang)}[/]\n" + ("\n".join(
+            f"[b #e0485b]{t('panel.ips', lang)}[/]\n" + ("\n".join(
                 f"{r['ip']} {r.get('country','??')} {'BLK' if r['blocked'] else 'see'}"
                 for r in state.blocked_ips[:8]) or none_yet)
         )
         self.query_one("#patches", Static).update(
-            f"[b cyan]{t('panel.patches', lang)}[/]\n" + ("\n".join(
+            f"[b #e0485b]{t('panel.patches', lang)}[/]\n" + ("\n".join(
                 f"{(p.get('path') or '?')} {'(dry)' if p.get('dry_run') else 'APPLIED'}"
                 for p in state.applied_patches[:8]) or none_yet)
         )
@@ -241,26 +242,26 @@ class SentinelDashboardApp(App):
             act = state.current_activity
         detail = f"  →  {state.current_detail}" if state.current_detail else ""
         self.query_one("#activity", Static).update(
-            f"[b cyan]{t('panel.activity', lang)}[/]\n[b #39ff14]▶ {act}[/]{detail}"
+            f"[b #e0485b]{t('panel.activity', lang)}[/]\n[b #9fd8a6]▶ {act}[/]{detail}"
         )
         # attack graph
         graph = "\n".join(_attack_graph(state.attack_series, 40))
         self.query_one("#attack", Static).update(
-            f"[b cyan]{t('panel.attack_graph', lang)}[/]\n[#ff6a00]{graph}[/]"
+            f"[b #e0485b]{t('panel.attack_graph', lang)}[/]\n[#ff6a00]{graph}[/]"
         )
         # pending patches
         self.query_one("#pending", Static).update(
-            f"[b cyan]{t('panel.pending', lang)}[/]\n" + ("\n".join(
+            f"[b #e0485b]{t('panel.pending', lang)}[/]\n" + ("\n".join(
                 f"{p.get('service','?')} {p.get('finding','?')} x{p.get('candidates',1)}"
                 for p in state.pending_patches[:8]) or none_yet)
         )
         # live log
         self.query_one("#logs", Static).update(
-            f"[b cyan]{t('panel.logs', lang)}[/]\n" + ("\n".join(state.recent_logs[-8:]) or none_yet)
+            f"[b #e0485b]{t('panel.logs', lang)}[/]\n" + ("\n".join(state.recent_logs[-8:]) or none_yet)
         )
         # security block stats (today / month / unique IPs)
         self.query_one("#blockstats", Static).update(
-            f"[b cyan]{t('panel.blockstats', lang)}[/]\n"
+            f"[b #e0485b]{t('panel.blockstats', lang)}[/]\n"
             f"[b #ff3355]{t('lbl.today', lang)}: {state.blocks_today}[/]   "
             f"{t('lbl.month', lang)}: {state.blocks_month}   IP: {len(state.blocked_ips)}"
         )
@@ -271,5 +272,5 @@ class SentinelDashboardApp(App):
             f"[{t('sandbox.planned', lang) if v.get('planned') else t('sandbox.breach', lang) if v.get('breached') else t('sandbox.clean', lang)}]"
             for v in sb) or t("sandbox.idle", lang)
         self.query_one("#sandbox", Static).update(
-            f"[b cyan]{t('panel.sandbox', lang)}[/]\n{sb_text}"
+            f"[b #e0485b]{t('panel.sandbox', lang)}[/]\n{sb_text}"
         )

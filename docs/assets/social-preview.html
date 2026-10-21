@@ -4,72 +4,74 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Sentinel-Guard social preview</title>
+<title>SAKI-MORI social preview</title>
 <style>
   :root {
-    --bg: #05090d; --panel: #0a141b; --grid: #0f2a2a;
-    --green: #39ff14; --cyan: #22d3ee; --amber: #ffd500; --red: #ff3355;
-    --text: #e6f6f3; --muted: #7fa3a0;
+    --paper: #f5f2eb;      /* warm off-white, like washi */
+    --ink: #17171c;        /* sumi ink */
+    --ink-soft: #5b5a60;
+    --crimson: #bc002d;    /* the one accent */
+    --crimson-soft: rgba(188, 0, 45, .08);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 1280px; height: 640px; background: var(--bg); overflow: hidden; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
   body {
-    font-family: "Inter", "DejaVu Sans", sans-serif; color: var(--text);
+    font-family: "Inter", "DejaVu Sans", sans-serif; color: var(--ink); position: relative;
     background:
-      radial-gradient(ellipse 700px 420px at 78% 50%, rgba(34, 211, 238, .14), transparent 70%),
-      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
-      var(--bg);
-    position: relative;
+      radial-gradient(ellipse 900px 600px at 20% 0%, rgba(255, 255, 255, .7), transparent 60%),
+      var(--paper);
   }
-  .wrap { position: absolute; inset: 64px 72px; display: flex; gap: 40px; align-items: center; }
+  /* faint sun: a soft crimson disc behind the right column */
+  .sun {
+    position: absolute; width: 470px; height: 470px; border-radius: 50%;
+    right: 92px; top: 85px;
+    background: radial-gradient(circle at 50% 50%, rgba(188, 0, 45, .13) 0 62%, rgba(188, 0, 45, 0) 71%);
+  }
+  .rule { position: absolute; left: 72px; right: 72px; bottom: 74px; height: 1px; background: rgba(23, 23, 28, .14); }
+  .wrap { position: absolute; inset: 70px 72px 90px; display: flex; gap: 40px; align-items: center; }
   .left { flex: 1 1 auto; }
-  .kicker { font: 600 20px/1 "DejaVu Sans Mono", monospace; color: var(--green); letter-spacing: .14em; }
-  h1 { font: 800 92px/1 "Inter Display", "Inter", sans-serif; letter-spacing: -.02em; margin: 18px 0 22px; }
-  h1 span { color: var(--cyan); }
-  .tag { font: 500 31px/1.3 "Inter", sans-serif; color: var(--text); max-width: 640px; }
-  .tag b { color: var(--green); font-weight: 700; }
+  .kicker { font: 700 19px/1 "DejaVu Sans Mono", monospace; color: var(--crimson); letter-spacing: .16em; }
+  h1 { font: 800 98px/1 "Inter Display", "Inter", sans-serif; letter-spacing: -.01em; margin: 20px 0 24px; }
+  h1 span { color: var(--crimson); }
+  .tag { font: 500 31px/1.3 "Inter", sans-serif; color: var(--ink); max-width: 640px; }
+  .tag b { color: var(--crimson); font-weight: 700; }
   .pills { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; max-width: 700px; }
   .pill {
-    font: 600 19px/1 "DejaVu Sans Mono", monospace; padding: 11px 16px; border-radius: 999px;
-    border: 1.5px solid rgba(57, 255, 20, .55); color: var(--green); background: rgba(57, 255, 20, .06);
+    font: 600 18px/1 "DejaVu Sans Mono", monospace; padding: 11px 16px; border-radius: 999px;
+    border: 1.5px solid rgba(23, 23, 28, .35); color: var(--ink); background: rgba(255, 255, 255, .55);
   }
-  .pill.c { border-color: rgba(34, 211, 238, .6); color: var(--cyan); background: rgba(34, 211, 238, .07); }
-  .right { flex: 0 0 430px; display: flex; flex-direction: column; align-items: center; gap: 26px; }
+  .pill.r { border-color: rgba(188, 0, 45, .55); color: var(--crimson); background: var(--crimson-soft); }
+  .right { flex: 0 0 430px; display: flex; flex-direction: column; align-items: center; gap: 26px; position: relative; }
   .term {
-    width: 430px; background: var(--panel); border: 1.5px solid rgba(34, 211, 238, .35);
-    border-radius: 14px; padding: 18px 22px; font: 500 16.5px/1.65 "DejaVu Sans Mono", monospace;
-    box-shadow: 0 0 40px rgba(34, 211, 238, .12);
+    width: 430px; background: var(--ink); color: #ece8e1; border-radius: 14px; padding: 18px 22px;
+    font: 500 16.5px/1.65 "DejaVu Sans Mono", monospace; box-shadow: 0 18px 40px rgba(23, 23, 28, .18);
   }
-  .term .p { color: var(--muted); }
-  .ok { color: var(--green); } .no { color: var(--red); } .dr { color: var(--amber); }
-  .foot { position: absolute; left: 72px; bottom: 30px; font: 500 17px/1 "DejaVu Sans Mono", monospace; color: var(--muted); }
+  .term .p { color: #8f8a83; }
+  .ok { color: #9fd8a6; } .no { color: #ff6b7f; } .dr { color: #e9c46a; }
+  .foot { position: absolute; left: 72px; bottom: 34px; font: 500 16px/1 "DejaVu Sans Mono", monospace; color: var(--ink-soft); }
 </style>
 </head>
 <body>
+  <div class="sun"></div>
   <div class="wrap">
     <div class="left">
-      <div class="kicker">// PROACTIVE DEFENSE FOR SERVERS YOU OWN</div>
-      <h1>Sentinel<span>-</span>Guard</h1>
+      <div class="kicker">PROACTIVE DEFENSE FOR SERVERS YOU OWN</div>
+      <h1>SAKI<span>-</span>MORI</h1>
       <p class="tag">Find &amp; fix <b>your own</b> servers' vulnerabilities before attackers do.</p>
       <div class="pills">
-        <span class="pill">consent-gated</span>
-        <span class="pill">fail-closed</span>
-        <span class="pill c">docker sandbox</span>
-        <span class="pill c">patch mesh</span>
+        <span class="pill r">consent-gated</span>
+        <span class="pill r">fail-closed</span>
+        <span class="pill">docker sandbox</span>
+        <span class="pill">patch mesh</span>
         <span class="pill">no hack-back</span>
       </div>
     </div>
     <div class="right">
-      <svg width="150" height="172" viewBox="0 0 150 172" aria-hidden="true">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#39ff14"/><stop offset="1" stop-color="#22d3ee"/>
-          </linearGradient>
-        </defs>
-        <path d="M75 6 L140 30 V82 C140 124 112 152 75 166 C38 152 10 124 10 82 V30 Z"
-              fill="rgba(34,211,238,.08)" stroke="url(#g)" stroke-width="6" stroke-linejoin="round"/>
-        <path d="M45 86 L67 108 L108 64" fill="none" stroke="#39ff14" stroke-width="11"
+      <svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true">
+        <circle cx="70" cy="70" r="66" fill="#bc002d"/>
+        <path d="M70 26 L104 39 V66 C104 88 90 103 70 111 C50 103 36 88 36 66 V39 Z"
+              fill="none" stroke="#f5f2eb" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M55 68 L66 79 L86 57" fill="none" stroke="#f5f2eb" stroke-width="7"
               stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <div class="term">
@@ -82,6 +84,7 @@
       </div>
     </div>
   </div>
-  <div class="foot">Python · Linux · nftables · Docker · LangGraph · Claude &nbsp;|&nbsp; own assets only</div>
+  <div class="rule"></div>
+  <div class="foot">sakimori — the guards who held their own frontier &nbsp;·&nbsp; own assets only</div>
 </body>
 </html>

@@ -52,6 +52,21 @@ sentinel mesh serve --host 10.8.0.2 --port 8787
 ```
 (Leave these running. Each is blocking; use tmux/systemd for production.)
 
+`serve` builds the ScopeGuard first (refuses to start without a valid signed scope
++ consent) and gates every received patch through the **sandbox ConflictEvaluator**.
+Give it a sandbox replica and/or local checks to make that gate able to pass:
+`serve` は ScopeGuard を必ず構築し、受信パッチはサンドボックスの競合検査を通ります。
+```bash
+sentinel mesh serve --host 10.8.0.2 --port 8787 \
+  --replica sbx-nginx.internal --compose docker/replica.yml      # default: restart check
+  # or/also: --check startup='docker compose -p sentinel_sbx_sbx_nginx_internal restart nginx'
+```
+Fail-closed rules / 安全側の規則: a peer's patch is recorded `applied` **only** if
+the checks really ran in the sandbox and all passed. In `dry_run: true` (default),
+with no checks, with no patch content (`hardened`) in the block, or on a hash
+mismatch / guard refusal, it stays `shared` and the ack carries the `reason`.
+Checks come only from the local operator — never from a peer's payload.
+
 ## 4. Propose a patch on one node and share it / パッチを作って共有
 ```bash
 # on A: create a signed patch block for A's domain
@@ -60,8 +75,10 @@ sentinel mesh propose --service sshd --finding CVE-2024-6387 --path /etc/ssh/ssh
 # on A: push it to B over the rolling-key channel
 sentinel mesh push --to serverB
 ```
-B receives it, verifies the signature, runs its conflict check, and (if clean)
-records it as applied on its chain. You'll see `peer ack: applied ref=…`.
+B receives it, verifies the signature, runs its sandbox conflict check, and (if the
+checks really ran and passed) records it as applied on its chain: `peer ack: applied
+ref=…`. Otherwise you'll see `peer ack: shared` (e.g. dry-run, or a block without
+patch content — CLI `propose` blocks currently carry metadata only).
 
 ## 5. Verify the shared chain / 共有チェーンを確認
 ```bash

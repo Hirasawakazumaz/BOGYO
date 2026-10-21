@@ -6,6 +6,10 @@ rolling-key channel advances per message (client sends blocks, server replies
 with encrypted acks). This keeps the "key changes with the exchanged data"
 property while staying robust across restarts (no long-lived ratchet to desync).
 
+A received block is recorded ``applied`` only if ``checker`` approves it — normally
+a :class:`~sentinel.mesh.gate.ConflictGate` over the sandbox ConflictEvaluator.
+With no checker, nothing is applied (blocks stay ``shared``, fail closed).
+
 Security note: this carries the authenticated, doubly-encrypted channel; the HTTP
 layer itself is just a pipe. Run it only between your own servers (ideally over a
 private network / WireGuard), as the consent requires.
@@ -28,6 +32,11 @@ from .ratchet import RatchetChannel, RatchetError, derive_root
 PATH = "/mesh"
 
 
+def _deny_all(_block: Block) -> bool:
+    """Default checker: without a real conflict gate nothing is applied (fail closed)."""
+    return False
+
+
 def _apply_incoming(node: MeshNode, peer_name: str, block_dict: dict,
                     checker: Callable[[Block], bool]) -> dict:
     """Verify a received block, add it to the chain, and conflict-gate apply."""
@@ -38,15 +47,23 @@ def _apply_incoming(node: MeshNode, peer_name: str, block_dict: dict,
         "shared_ref": block.hash, "author": block.author, **block.payload
     }, status="shared")
     node.chain.append(rebased)
-    if checker(rebased):
+    try:
+        decision = checker(rebased)  # e.g. a ConflictGate (GateDecision) or a plain bool
+    except Exception:  # noqa: BLE001 - a crashing checker must never let a patch through
+        decision = False
+    if decision:
         node.consider_apply(rebased, lambda _b: True)
         return {"status": "applied", "ref": rebased.hash}
-    return {"status": "shared", "ref": rebased.hash}
+    ack = {"status": "shared", "ref": rebased.hash}
+    reason = getattr(decision, "reason", "")
+    if reason:
+        ack["reason"] = reason
+    return ack
 
 
 class _Handler(BaseHTTPRequestHandler):
     node: MeshNode = None            # set on the server instance
-    checker: Callable[[Block], bool] = staticmethod(lambda b: True)
+    checker: Callable[[Block], bool] = staticmethod(_deny_all)
 
     def log_message(self, *a):  # silence default logging
         pass
@@ -84,7 +101,7 @@ class _Handler(BaseHTTPRequestHandler):
 def make_server(node: MeshNode, host: str, port: int,
                 checker: Optional[Callable[[Block], bool]] = None) -> ThreadingHTTPServer:
     handler = type("_H", (_Handler,), {"node": node,
-                                       "checker": staticmethod(checker or (lambda b: True))})
+                                       "checker": staticmethod(checker or _deny_all)})
     return ThreadingHTTPServer((host, port), handler)
 
 

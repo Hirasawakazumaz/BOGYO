@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 
+from sentinel.core import killswitch
 from sentinel.core.errors import SigningError
+from sentinel.guards import ScopeGuard
 from sentinel.mesh import (
-    Block, MeshNode, NodeIdentity, PatchChain, RatchetChannel, RatchetError, derive_root,
+    Block, ConflictGate, MeshNode, NodeIdentity, PatchChain, RatchetChannel, RatchetError, derive_root,
 )
+from sentinel.patch import ConflictEvaluator
 
 
 # -- identity --------------------------------------------------------------- #
@@ -114,3 +119,124 @@ def test_transport_push_over_http_loopback():
     assert acks and acks[0]["status"] in ("applied", "shared")
     assert nb.chain.height() >= 1
     assert nb.chain.validate()
+
+
+# -- conflict gate (real sandbox ConflictEvaluator, fail closed) ------------- #
+HARDENED = "PermitRootLogin no\nPasswordAuthentication no\n"
+CHECKS = [("startup:restart", ["docker", "compose", "-p", "sentinel_sbx_x", "restart", "sshd"])]
+
+
+def _patch_block(node, hardened=HARDENED, **extra):
+    payload = {"service": "sshd", "finding": "F-ssh", "path": "/etc/ssh/sshd_config",
+               "original": "PermitRootLogin yes\n", "hardened": hardened,
+               "hardened_sha256": hashlib.sha256(hardened.encode()).hexdigest()}
+    payload.update(extra)
+    return node.propose(payload)
+
+
+def _gate(make_env, *, dry_run, rc=0, checks=CHECKS):
+    env = make_env(dry_run=dry_run)
+    guard = ScopeGuard.from_settings(env.settings)
+    calls = []
+
+    def runner(args):
+        calls.append(args)
+        return rc, ""
+
+    return ConflictGate(ConflictEvaluator(guard, runner=runner), checks), calls, env
+
+
+def _pair_nodes():
+    a, b = NodeIdentity.create("A"), NodeIdentity.create("B")
+    na, nb = MeshNode(a, "sshd"), MeshNode(b, "nginx")
+    na.add_peer("B", b.ed25519_pub(), b.x25519_pub(), "nginx")
+    nb.add_peer("A", a.ed25519_pub(), a.x25519_pub(), "sshd")
+    return na, nb
+
+
+def _push_via_http(na, nb, block, checker=None):
+    from sentinel.mesh import push, serve
+
+    srv = serve(nb, "127.0.0.1", 0, checker=checker, background=True)
+    try:
+        return push(na, "B", f"http://127.0.0.1:{srv.server_address[1]}", [block])
+    finally:
+        srv.shutdown()
+
+
+def test_transport_without_checker_never_applies():
+    na, nb = _pair_nodes()
+    acks = _push_via_http(na, nb, _patch_block(na))
+    assert acks[0]["status"] == "shared"
+    assert nb.chain.applied() == []
+
+
+def test_gate_live_checks_pass_applies_over_http(make_env):
+    gate, calls, _ = _gate(make_env, dry_run=False, rc=0)
+    na, nb = _pair_nodes()
+    acks = _push_via_http(na, nb, _patch_block(na), checker=gate)
+    assert acks[0]["status"] == "applied"
+    assert calls == [CHECKS[0][1]]          # the operator's local check, run once
+    assert len(nb.chain.applied()) == 1 and nb.chain.validate()
+
+
+def test_gate_live_conflict_keeps_shared(make_env):
+    gate, _, _ = _gate(make_env, dry_run=False, rc=1)
+    na, nb = _pair_nodes()
+    acks = _push_via_http(na, nb, _patch_block(na), checker=gate)
+    assert acks[0]["status"] == "shared" and "startup:restart" in acks[0]["reason"]
+    assert nb.chain.applied() == []
+
+
+def test_gate_dry_run_never_applies(make_env):
+    gate, calls, _ = _gate(make_env, dry_run=True)
+    na, _nb = _pair_nodes()
+    d = gate(_patch_block(na))
+    assert not d and d.dry_run and "dry-run" in d.reason
+    assert calls == []                      # nothing executed in dry-run
+
+
+def test_gate_refuses_missing_content_and_bad_hash(make_env):
+    gate, calls, _ = _gate(make_env, dry_run=False)
+    na, _nb = _pair_nodes()
+    assert "no patch content" in gate(na.propose({"service": "sshd", "finding": "F1"})).reason
+    bad = _patch_block(na, hardened_sha256="0" * 64)
+    assert "mismatch" in gate(bad).reason
+    assert calls == []
+
+
+def test_gate_refuses_when_no_checks(make_env):
+    gate, _, _ = _gate(make_env, dry_run=False, checks=[])
+    na, _nb = _pair_nodes()
+    d = gate(_patch_block(na))
+    assert not d and "no conflict checks" in d.reason
+
+
+def test_gate_fails_closed_on_kill_switch_and_escalation(make_env):
+    gate, calls, env = _gate(make_env, dry_run=False,
+                             checks=[("startup", ["docker", "run", "--privileged", "x"])])
+    na, _nb = _pair_nodes()
+    assert "ModeViolation" in gate(_patch_block(na)).reason
+
+    gate2 = ConflictGate(gate.evaluator, CHECKS)
+    killswitch.engage(env.settings.paths.killswitch_file, reason="test")
+    d = gate2(_patch_block(na))
+    assert not d and "refused" in d.reason
+    assert calls == []
+
+
+def test_cli_mesh_serve_fails_closed_before_listening(make_env, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    import sentinel.mesh as mesh_pkg
+    from sentinel.cli.main import main
+
+    monkeypatch.setattr(mesh_pkg, "serve", lambda *a, **k: pytest.fail("must not serve"))
+    env = make_env()
+    sp = str(tmp_path / "settings.yaml")
+    env.settings.save(sp)
+    # production replica is refused before the node key is even loaded
+    assert main(["mesh", "--settings", sp, "serve", "--replica", "web01.test.internal"]) == 1
+    # no valid consent -> the guard refuses, so the endpoint never starts
+    Path(env.settings.paths.consent_file).unlink()
+    assert main(["mesh", "--settings", sp, "serve", "--passphrase", "x"]) == 2

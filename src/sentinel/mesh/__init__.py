@@ -15,12 +15,14 @@ from .identity import NodeIdentity, machine_fingerprint
 from .ratchet import RatchetChannel, RatchetError, derive_root
 from .chain import Block, PatchChain
 from .node import MeshNode
+from .gate import ConflictGate, GateDecision
 from .transport import make_server, push, serve
 
 __all__ = [
     "NodeIdentity", "machine_fingerprint",
     "RatchetChannel", "RatchetError", "derive_root",
     "Block", "PatchChain", "MeshNode",
+    "ConflictGate", "GateDecision",
     "serve", "push", "make_server",
 ]
 

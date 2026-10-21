@@ -413,10 +413,25 @@ def cmd_mesh(args) -> int:
         return 0
 
     if args.action == "serve":
+        from ..mesh import ConflictGate
+        from ..patch import ConflictEvaluator
+
+        # Peers' patches are applied only through the guarded sandbox conflict-eval.
+        guard = ScopeGuard.from_settings(settings)
+        sandbox = None
+        if args.replica:
+            if not guard.scope.contains(args.replica) or guard.scope.is_production(args.replica):
+                _print(f"ERROR: --replica {args.replica!r} must be an in-scope, non-production host")
+                return 1
+            sandbox = SandboxReplay(guard, replica=args.replica, compose_file=args.compose)
+        checks = _parse_validations(args.check) or None
+        gate = ConflictGate(ConflictEvaluator(guard, sandbox=sandbox), checks)
         node = node_from_settings(settings, _pw())
         _print(f"mesh node '{node.identity.name}' (domain={node.domain}) serving on {args.host}:{args.port}")
         _print(f"peers: {', '.join(p.name for p in mc.peers) or '(none)'}  — Ctrl-C to stop")
-        mesh_serve(node, args.host, args.port)  # blocking
+        mode = "DRY-RUN (peers' patches stay shared)" if settings.dry_run else "LIVE sandbox checks"
+        _print(f"conflict gate: {mode}; replica={args.replica or '-'} checks={len(checks or [])}")
+        mesh_serve(node, args.host, args.port, checker=gate)  # blocking
         return 0
 
     if args.action == "push":
@@ -435,7 +450,8 @@ def cmd_mesh(args) -> int:
             return 0
         acks = mesh_push(node, args.to, endpoint, blocks)
         for a in acks:
-            _print(f"  peer ack: {a.get('status')}  ref={str(a.get('ref'))[:16]}")
+            reason = f"  ({a['reason']})" if a.get("reason") else ""
+            _print(f"  peer ack: {a.get('status')}  ref={str(a.get('ref'))[:16]}{reason}")
         return 0
     return 0
 
@@ -563,6 +579,10 @@ def build_parser() -> argparse.ArgumentParser:
     msv = msub.add_parser("serve", help="run this node's mesh endpoint (blocking)")
     msv.add_argument("--host", default="127.0.0.1"); msv.add_argument("--port", type=int, default=8787)
     msv.add_argument("--passphrase", default="")
+    msv.add_argument("--replica", default="", help="in-scope, non-production sandbox replica for conflict-eval")
+    msv.add_argument("--compose", default=None, help="docker compose file of the replica (default restart check)")
+    msv.add_argument("--check", action="append", metavar="NAME=CMD",
+                     help="local conflict check run in the sandbox (repeatable); never taken from peers")
     mpu = msub.add_parser("push", help="send patch block(s) to a peer over the rolling-key channel")
     mpu.add_argument("--to", required=True, help="peer name from mesh.peers")
     mpu.add_argument("--endpoint", default="", help="override peer endpoint (http://host:port)")

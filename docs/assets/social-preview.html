@@ -32,7 +32,12 @@
   .left { flex: 1 1 auto; }
   .kicker { font: 700 19px/1 "DejaVu Sans Mono", monospace; color: var(--crimson); letter-spacing: .16em; }
   h1 { font: 800 124px/1 "Inter Display", "Inter", sans-serif; letter-spacing: -.01em; margin: 20px 0 24px; }
-  h1 span { color: var(--crimson); }
+  /* the first O of BOGYO is a perfect, filled crimson circle (a quiet hinomaru):
+     an empty inline-block sits on the baseline, so its height = Inter's cap height */
+  h1 .sun-o {
+    display: inline-block; width: .727em; height: .727em; border-radius: 50%;
+    background: var(--crimson); margin: 0 .045em 0 .03em; vertical-align: baseline;
+  }
   .tag { font: 500 31px/1.3 "Inter", sans-serif; color: var(--ink); max-width: 640px; }
   .tag b { color: var(--crimson); font-weight: 700; }
   .pills { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; max-width: 700px; }
@@ -56,7 +61,7 @@
   <div class="wrap">
     <div class="left">
       <div class="kicker">PROACTIVE DEFENSE FOR SERVERS YOU OWN</div>
-      <h1>B<span>O</span>GYO</h1>
+      <h1 aria-label="BOGYO">B<span class="sun-o"></span>GYO</h1>
       <p class="tag">Find &amp; fix <b>your own</b> servers' vulnerabilities before attackers do.</p>
       <div class="pills">
         <span class="pill r">consent-gated</span>

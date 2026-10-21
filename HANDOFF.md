@@ -1,17 +1,17 @@
 # Sentinel-Guard — HANDOFF
 
-Living status doc. Update + commit (and push to the private GitHub repo) at every milestone.
+Living status doc for contributors. Update it at every milestone.
 
 ## What this is
 Authorized, **consent-gated, fail-closed** proactive defense & self-pentest orchestration
 for Linux servers — for assets **you own or are explicitly authorized to test** only.
 Finds/fixes vulnerabilities before attackers, auto-blocks attacking IPs, validates findings
-in isolated Docker sandboxes, proposes/evaluates patches, and shows it all on a cyber
-world-map dashboard.
+in isolated Docker sandboxes, proposes/evaluates patches, shares patches across your own
+servers, and shows it all on a cyber dashboard.
 
-## Where / how to run
-- Path: your checkout of the repository.
-- Env: `. .venv/bin/activate`; tests: `python -m pytest -q`.
+## How to run
+- `python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"`
+- Tests: `python -m pytest -q` (CI runs them on Python 3.11–3.13: `.github/workflows/ci.yml`).
 - Extras: `pip install -e ".[agent]"` (LangGraph/LLM), `".[tui]"` (Textual dashboard). Core
   + plain snapshot run without either.
 
@@ -25,53 +25,38 @@ the compose file (internal-only networks; refuses docker-socket/host binds, cap_
 devices, unconfined security_opt, host namespaces, privileged, published ports); validation
 commands must be bound to the sandbox network.
 
-## Status (as of 2026-10-18)
-Branch `main`, all tests green: **85 passed**. Latest additions:
-- Real Anthropic token accounting wired into the usage Governor (`d292219`): budget
-  picks the model tier and stops/resumes; offline rule fallback when stopped.
-- i18n (en/ja) chosen at `sentinel init` (`ui.language`) + a machine-readable control
-  API `sentinel config dump|get|set` and `sentinel state --json` so other apps can read
-  and change every display/settings item (`4a0be38`). `geo.static_map {ip: ISO2}` gives
-  offline deterministic IP→country (also powers the offline live demo).
-- **Live demo** (separate path, NOT in the repo): `a separate local demo directory` —
-  `bash setup_demo.sh`, then `bash run_feed.sh` (terminal A) + `bash run_dashboard.sh`
-  (terminal B). See its `README_DEMO.md`.
+Never commit secrets or local state: keys, consent, `config/scope.yaml`,
+`config/settings.yaml`, `state/` are gitignored, and CI fails if any is tracked.
 
-Commits on top of v0.1 (`60ff6b9`):
-- `6986dd3` sandbox replay (Phase 4)
-- `3b66780` patch proposer + conflict-eval loop (Phase 5)
-- `a175fb7` graph/schedule/report (Phase 6)
-- `553e7a6` docs for Phases 4-6
-- `e09dc14` graph skip fix
-- `3a3c518` **sandbox isolation hardening (F1/F2/F3)** via YAML structural analysis
-- (this milestone) **cyber dashboard + usage governor + geo** — see below
-
-### This milestone: dashboard, usage governor, geo
-- `sentinel/usage/` — `UsageLedger` (token ledger) + `Governor`: daily token budget drives
-  automatic model downgrade (tiers) → frequency throttle → stop, auto-resume at local
-  midnight. Provider `api` (metered) or `cli` (subscription, no token-stop). `sentinel usage`.
-- `sentinel/intel/geo.py` — IP→country via a keyless public API (opt-in; private IPs never
-  sent; offline → unknown) + country centroids for the map.
-- `sentinel/dashboard/` — `DashboardModel` aggregates the audit log + usage + geo;
-  `worldmap.py` renders the ASCII world map with attacker→home arrows (blocked `x` / active
-  `!` / home `@`); `snapshot.py` prints a plain CASIO-watch/cyber panel (no deps);
-  `app.py` is the interactive Textual UI (green/cyan cyber theme, live refresh, **config
-  screen** to edit settings from the TUI). `sentinel dashboard [--once]`.
-- Settings gained `usage:` and `geo:` sections; `Settings.save()` lets the TUI persist them.
+## Status
+All tests green (114). Recent milestones:
+- CLI output goes through one English string table (`sentinel/i18n.py`). The UI is
+  English-only; a legacy `ui.language` value is accepted and resolves to English.
+- **Mesh conflict gate** (`sentinel/mesh/gate.py`): a peer's patch is recorded `applied`
+  only if the local sandbox `ConflictEvaluator` actually ran its checks and all passed.
+  Dry-run, no checks, missing patch content, hash mismatch, or any guard refusal keep it
+  `shared`. Transport default denies. `mesh serve` builds the ScopeGuard first and takes
+  `--replica/--compose/--check` (checks are local only, never from a peer).
+- **RuleBackend** hardening rules for sshd / nginx / postgres / sysctl; missing directives
+  are inserted at a safe spot (sshd: before the first `Match`; nginx: inside `http {}`);
+  rules only ever tighten and are idempotent.
+- Usage governor (daily token budget → model downgrade → throttle → stop), control API
+  (`sentinel config dump|get|set`, `sentinel state --json`), dashboard (TUI + snapshot),
+  sandbox replay, patch loop, graph/schedule/report.
 
 ## How to use (operator)
 `sentinel init` → edit `config/scope.yaml` (owned assets only) → `keygen` → `sign-scope` →
 `consent` → `status`/`verify`. Then `block`/`scan`/`sandbox`/`patch`/`schedule`/`report`,
-`usage`, and `dashboard`. Enable real actions only after reviewing dry-run output
+`usage`, `dashboard`, and `mesh`. Enable real actions only after reviewing dry-run output
 (`dry_run: false` + the specific toggle).
 
 ## Known follow-ups / not done
+- `mesh propose` blocks carry metadata only (no `hardened` content), so the conflict gate
+  never applies them; add content + `hardened_sha256` generation to `propose`.
+- `ConflictEvaluator` runs its checks but does not first write the candidate into the
+  sandbox replica; `--check` commands are escalation-checked but not required to be bound
+  to the sandbox network.
 - `apply_to_host` writes the **local** file at `candidate.path` (host arg is scope-check +
   audit only); no backup before overwrite. Fine for local, misleading for remote hosts.
-- `SandboxReplay.up()/down()` (docker network/compose) are not themselves toggle-gated
-  (only the attack `validate()` is). Benign (standing up your own container) but noted.
-- Dashboard geo lookups run inline on refresh; with many IPs + geo enabled, consider a
-  background worker.
-- LLM token accounting is wired through `Governor.record(...)`; connect the Anthropic
-  backend's real response usage to it when running with `[agent]`.
-- Not yet pushed to GitHub as of the pre-dashboard commits; repo is **private**.
+- `SandboxReplay.up()/down()` are not themselves toggle-gated (only `validate()` is).
+- Dashboard geo lookups run inline on refresh; consider a background worker.

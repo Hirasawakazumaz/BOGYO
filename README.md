@@ -1,5 +1,13 @@
 # Sentinel-Guard
 
+[![CI](https://github.com/Hirasawakazumaz/sentinel-guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hirasawakazumaz/sentinel-guard/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![License: MIT + use notice](https://img.shields.io/badge/license-MIT%20%2B%20use%20notice-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-114%20passing-brightgreen)](tests/)
+[![Safety: fail-closed](https://img.shields.io/badge/safety-fail--closed%20%C2%B7%20dry--run%20default-orange)](docs/SAFE_USE.md)
+
+![Sentinel-Guard — proactive defense for servers you own](docs/assets/social-preview.png)
+
 **Authorized, consent-gated proactive defense & self-pentest orchestration for Linux servers.**
 
 Sentinel-Guard helps you find and fix vulnerabilities on **your own** servers *before*
